@@ -42,12 +42,15 @@
      with the thing it hides is no way back. */
   main.narrow{grid-template-columns:0 1fr}
   main.narrow .side{display:none}
-  .sidegrip{position:absolute;left:340px;top:50%;transform:translate(-50%,-50%);z-index:14;
+  /* THE GRIP RIDES LEVEL WITH THE KEY BOX (21k), not halfway down the map:
+     halfway down is where a thumb rests while pinching, and it was being
+     caught by accident on the iPad. */
+  .sidegrip{position:absolute;left:340px;top:56px;transform:translate(-50%,0);z-index:14;
     width:22px;height:56px;margin:0;padding:0;border-radius:5px;
     background:var(--panel);color:var(--muted);border:1px solid var(--line);
     box-shadow:0 1px 4px rgba(0,0,0,.10);font-size:12px;line-height:1;cursor:pointer}
   .sidegrip:hover{background:#f4f2ec;color:var(--ink)}
-  main.narrow .sidegrip{left:0;transform:translate(0,-50%);border-radius:0 6px 6px 0;border-left:0}
+  main.narrow .sidegrip{left:0;transform:translate(0,0);border-radius:0 6px 6px 0;border-left:0}
   @media(max-width:820px){.sidegrip{display:none}}
   .side label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 4px}
   .side input[type=text],.side input[type=password]{
@@ -372,13 +375,15 @@
     <button id="itemEditDel" class="ghost" style="margin:0;padding:3px 7px;font-size:11px">Remove</button>
   </div>
 </div>
-<div class="roofbar" id="roofDock">
+<div class="roofbar" id="roofDock" style="display:none">
   <div class="rbmain">
     <div class="rbcol">
       <span class="rblab">Mode</span>
       <div class="rbpair">
         <button id="modePlot" class="ghost">Plot</button>
         <button id="modeRoof" class="ghost" disabled>Roof</button>
+        <button id="selAdd" class="ghost"
+                title="Tap plots to add them to the highlight, or tap a highlighted one to take it out. Shift-click does the same on a keyboard.">Add plots</button>
       </div>
       <div class="rbpair" style="margin-top:4px">
         <button id="itSelect" class="ghost"
@@ -9696,7 +9701,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-21j';
+const BUILD='build 2026-08-21l';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -9758,6 +9763,20 @@ function selArea(){
    plots to anchor in its place. With nothing else held there is nothing to
    promote, and the anchor stays: a selection of no plots is not a state this
    tool has, and every readout would have to learn it. */
+/* THE MODIFIER AS A MODE (21l). Shift-click adds a plot to the highlight,
+   and an iPad has no shift. While this is on, a tap does what shift-click
+   does; off, a tap starts again, which is the behaviour everyone already
+   knows. */
+let SELADD=false;
+function setSelAdd(on,quiet){
+  SELADD=(on===undefined)?!SELADD:!!on;
+  const b=$('selAdd');
+  if(b){ b.classList.toggle('on',SELADD);
+         b.style.background=SELADD?'#f1efe8':'transparent'; }
+  if(!quiet) say(SELADD
+    ? 'Tap plots to add them to the highlight. Tap a highlighted one to take it out.'
+    : 'Back to one plot at a time.');
+}
 function selToggle(i){
   if(i===SEL){
     if(!SELSET.size) return false;               // nothing to hand the anchor to
@@ -10588,6 +10607,7 @@ function autosaveRestore(){
   try{ had=restoreSession(j); }catch(_){ had=false; }
   if(j.location_label&&$('loc')) $('loc').value=j.location_label;
   if(!had||SEL<0||!AREAS[SEL]){ SEL=(typeof autoPick==='function')?autoPick():0; SELSET.clear(); }
+  syncDock();                       // a restored session has a map, so the bar belongs
   return true;
 }
 function autosaveClear(){ try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(_){} }
@@ -13839,7 +13859,17 @@ const CLASS_OF=f=>{
 };
 
 /* ---------- selection readout ---------- */
+/* THE TOOL BAR IS FOR A MAP THAT EXISTS. Nothing on it can be used before a
+   fetch -- every tool reads AREAS -- and on the iPad it pushed the key and
+   the address box off the screen. Shown the moment there is something to
+   work on, hidden again if the map is ever emptied. Asked from one place so
+   the fetch, an import and a restored autosave cannot disagree. */
+function syncDock(){
+  const d=$('roofDock');
+  if(d) d.style.display=(AREAS&&AREAS.length)?'':'none';
+}
 function showSel(){
+  syncDock();
   const bSel=$('exportSel');
   /* Every path that changes the highlight ends here, so this is the one place
      the plot tools need to be told — arming a hedge with nothing highlighted
@@ -25620,6 +25650,11 @@ $('ptClear').onclick=(e)=>{
 };
 function setMode(m){
   MODE=m;
+  /* the toggle belongs to the plot, so it stands down on the way to the roof
+     -- coming back to a mode with a modifier silently latched is a way to
+     lose a selection */
+  if(m!=='plot'&&typeof SELADD!=='undefined'&&SELADD) setSelAdd(false,true);
+  if($('selAdd')) $('selAdd').style.display=(m==='plot')?'':'none';
   LINEHOVER=null; $('linechip').style.display='none';
   $('roofPanel').style.display=m==='roof'?'flex':'none';
   syncItems(); syncRoofPick(); syncPlotItems(); syncRoofItemList();
@@ -25627,6 +25662,7 @@ function setMode(m){
   $('modeRoof').style.background=m==='roof'?'#f1efe8':'transparent';
   draw();
 }
+$('selAdd').onclick=()=>setSelAdd();
 $('modePlot').onclick=()=>setMode('plot');
 $('modeRoof').onclick=()=>setMode('roof');
 /* Ridge mode swallows clicks on the roof, so anything else that wants them has
@@ -27114,7 +27150,9 @@ canvas.addEventListener('pointerup',e=>{
     if(polyHit(AREAS[i],[mx,my])){
       /* shift adds a plot to the highlight; a plain click starts again, so
          the old behaviour is exactly what you get without the key down */
-      if(e.shiftKey&&SEL>=0&&i!==SEL){ selToggle(i); draw(); showSel(); return; }
+      /* the key OR the mode: an iPad has no shift, and the two do the same
+         thing so nothing anyone already knows has changed */
+      if((e.shiftKey||SELADD)&&SEL>=0&&i!==SEL){ selToggle(i); draw(); showSel(); return; }
       SEL=i; SELSET.clear(); draw(); showSel(); return;
     }
   }
