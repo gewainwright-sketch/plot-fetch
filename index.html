@@ -151,6 +151,15 @@
     background:#fff;border:1px solid var(--line);border-radius:9px;padding:11px 12px;
     box-shadow:0 10px 30px rgba(0,0,0,.20)}
   .rbpair{display:grid;grid-template-columns:repeat(2,minmax(74px,1fr));gap:4px}
+  /* THE MEASURE LABEL RESERVES ITS WIDEST WORD (21t). It swaps 'Measure'
+     for 'Measuring' when armed, two letters wider, and the column is
+     minmax(74px,1fr) -- so the wider word widened the column and the whole
+     bar shuffled round it. The ghost below is 'Measuring' with no height
+     and nothing visible: it holds the width, and the real text changes
+     inside it. */
+  #rulerLab{position:relative}
+  #rulerLab::after{content:'Measuring';display:block;height:0;overflow:hidden;
+    visibility:hidden;font-weight:600}
   .rbtitle{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-right:4px}
   /* 8px: another tenth off, as asked -- the titles are labels, not reading */
   .rblab{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 2px}
@@ -412,7 +421,7 @@
                 title="Pick items up and move them">Select</button>
         <button id="rulerBtn" class="ghost split"
                 title="Drag on the map to measure a distance. Measurements are working marks — they are never exported."><span data-half="rect" id="rulerLab">Measure</span><span
-                id="rulerUndo" data-half="undo" style="display:none"
+                id="rulerUndo" data-half="undo" style="visibility:hidden"
                 title="Take back the last measurement, and nothing else">↶</span></button>
         <button id="ptUndo" class="ghost" disabled
                 title="Take back the last thing done — a point, an item, a rub, a measurement, a cut">Undo</button>
@@ -9725,7 +9734,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-21r';
+const BUILD='build 2026-08-21t';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -9794,6 +9803,22 @@ function areaLabAt(i){
   const off=AREALAB[areaLabKey(i)]||[0,0];
   return [c[0]+off[0], c[1]+off[1]];
 }
+/* how big the plot is on the ground, so the label can be sized against it:
+   the diagonal of its bounding box, which behaves for a long thin strip as
+   well as for a square */
+function areaLabSpan(i){
+  const f=AREAS[i];
+  if(!f) return 20;
+  let lo=[1e12,1e12], hi=[-1e12,-1e12];
+  for(const r of rings(f.geometry)) for(const q of r){
+    if(q[0]<lo[0]) lo[0]=q[0];
+    if(q[1]<lo[1]) lo[1]=q[1];
+    if(q[0]>hi[0]) hi[0]=q[0];
+    if(q[1]>hi[1]) hi[1]=q[1];
+  }
+  const w=hi[0]-lo[0], h=hi[1]-lo[1];
+  return (isFinite(w)&&isFinite(h))?Math.hypot(w,h):20;
+}
 function areaLabText(i){
   const f=AREAS[i];
   return f?(featureArea(f).toFixed(1)+' m\u00b2'):'';
@@ -9820,33 +9845,49 @@ function drawAreaLabels(g,X,Y,k,live){
     const px=X(p[0],p[1]), py=Y(p[0],p[1]);
     const big=areaLabText(i);
     const cap='Approximate area';
+    /* SIZED IN METRES, NOT PIXELS (21s). The label names a plot, so it
+       belongs to the plot: its letters are a fraction of that plot's own
+       span, and zooming changes what a metre is worth on screen without
+       changing what the label is worth on the ground. Clamped, so a
+       postage-stamp yard still reads and a paddock does not shout. */
+    const ppm=Math.hypot(X(1,0)-X(0,0),Y(1,0)-Y(0,0))||1;   // pixels per metre
+    const span=areaLabSpan(i);
+    /* a 26th of the plot's span was too shouty on a normal garden -- the
+       caption filled the width of it. A 40th reads as a note on the plan. */
+    const capM=Math.max(0.22,Math.min(0.80,span/40));       // metres tall
+    const bigM=capM*1.35;
+    const capPx=Math.max(7,capM*ppm), bigPx=Math.max(9,bigM*ppm);
     g.textAlign='center'; g.textBaseline='middle';
-    g.font=(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    g.font=capPx+'px system-ui,-apple-system,"Segoe UI",sans-serif';
     const mc=g.measureText(cap);
-    const wc=(mc&&isFinite(mc.width))?mc.width:cap.length*5.5*k;
-    g.font='600 '+(13*k)+'px ui-monospace,Menlo,monospace';
+    const wc=(mc&&isFinite(mc.width))?mc.width:cap.length*capPx*0.55;
+    g.font='600 '+bigPx+'px ui-monospace,Menlo,monospace';
     const mb=g.measureText(big);
-    const wb=(mb&&isFinite(mb.width))?mb.width:big.length*8*k;
-    const w=Math.max(wc,wb)+14*k, h=34*k;
+    const wb=(mb&&isFinite(mb.width))?mb.width:big.length*bigPx*0.62;
+    const w=Math.max(wc,wb)+capPx*1.2, h=(capPx+bigPx)*1.5;
     const x0=px-w/2, y0=py-h/2;
+    const capY=y0+h*0.32, bigY=y0+h*0.72;
     /* NO BOX (21r): the caption and the figure stand on the drawing on their
        own. The press box is unchanged -- it is where the words are, which is
        all the panel was ever marking. A thin light halo is laid under the
        text instead, so it stays readable over decking or tarmac without
        drawing a frame round itself. */
+    /* THE HALO IS PROPORTIONAL AND QUIET (21s). A flat 3px stroke under a
+       small label reads as a white block, which is the white George saw. A
+       fifth of the letter height at half strength lifts the words off
+       decking without showing itself. */
     g.lineJoin='round';
-    g.strokeStyle='rgba(253,252,249,0.85)';
-    g.lineWidth=3*k;
-    g.strokeText(cap,px,y0+11*k);
-    g.font='600 '+(13*k)+'px ui-monospace,Menlo,monospace';
-    g.strokeText(big,px,y0+24*k);
-    g.font=(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    g.strokeStyle='rgba(253,252,249,0.5)';
+    g.font=capPx+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    g.lineWidth=Math.max(1,capPx*0.2);
+    g.strokeText(cap,px,capY);
     g.fillStyle='#6b6860';
-    g.font=(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
-    g.fillText(cap,px,y0+11*k);
+    g.fillText(cap,px,capY);
+    g.font='600 '+bigPx+'px ui-monospace,Menlo,monospace';
+    g.lineWidth=Math.max(1,bigPx*0.2);
+    g.strokeText(big,px,bigY);
     g.fillStyle='#1c1c1a';
-    g.font='600 '+(13*k)+'px ui-monospace,Menlo,monospace';
-    g.fillText(big,px,y0+24*k);
+    g.fillText(big,px,bigY);
     if(live) AREAHITS.push({i:i,x:x0,y:y0,w:w,h:h});
   }
   g.restore();
@@ -13872,8 +13913,12 @@ function syncRuler(){
   if(lab) lab.textContent=RULERMODE?'Measuring':'Measure';
   /* THE UNDO ARROW LIVES INSIDE THE MEASURE BUTTON (21r), on its right, and
      shows itself only once there is a measurement to take back. */
+  /* THE ARROW HOLDS ITS PLACE (21s). It was display:none until a
+     measurement existed, so the Measure button widened the moment one was
+     taken and shoved the whole row along. Hidden by visibility instead: the
+     space is there either way and nothing moves. */
   const u=$('rulerUndo');
-  if(u) u.style.display=RULERS.length?'':'none';
+  if(u) u.style.visibility=RULERS.length?'visible':'hidden';
 }
 /* the arrow is a half of the Measure button now, so its press arrives at
    that button's handler; this stays for anything that clicks it directly */
