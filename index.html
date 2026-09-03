@@ -24,6 +24,8 @@
   /* NO TITLE ROW AT ALL. It was already only a caption; George wanted the
      columns in its place, so the h1 is gone and the header's padding with
      it. What is left is the bar, starting where the title used to. */
+  /* the bottom padding is the gap UNDER the last row of buttons, and it now
+     matches the 4px between the rows themselves (21n) */
   header{padding:6px 20px 4px;border-bottom:1px solid var(--line);display:flex;gap:10px;
     align-items:baseline;flex-wrap:wrap;position:sticky;top:0;z-index:30;background:var(--paper)}
   header .sub{color:var(--muted);font-size:10.5px;line-height:1.1}
@@ -124,7 +126,7 @@
      border draws that line), no top margin, and nothing hanging below the
      last row */
   .roofbar{flex:1 0 100%;margin-top:0;padding-top:0}
-  .rbmain{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+  .rbmain{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;margin-bottom:0}
   .rbgroup{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
   .rbcol{display:flex;flex-direction:column;gap:4px;position:relative}
   /* Advanced floats free over the page rather than sitting inside the bar.
@@ -150,7 +152,8 @@
     box-shadow:0 10px 30px rgba(0,0,0,.20)}
   .rbpair{display:grid;grid-template-columns:repeat(2,minmax(74px,1fr));gap:4px}
   .rbtitle{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-right:4px}
-  .rblab{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 2px}
+  /* 8px: another tenth off, as asked -- the titles are labels, not reading */
+  .rblab{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 2px}
   .rbsep{width:1px;height:18px;background:var(--line);margin:0 3px}
   /* the global button rule is width:100%, which turns every button in a flex
      row into its own line — that is what stacked the toolbar vertically */
@@ -177,10 +180,12 @@
      said nothing worth a line of the bar, and George wanted the bar to end
      under the buttons. Empty means gone; the margin lives on the line
      itself, so an empty one costs no height either. */
-  #roofHint{margin-top:5px;margin-bottom:0}
+  #roofHint{margin-top:4px;margin-bottom:0}
   #roofHint:empty{display:none}
+  /* 6px, not 10: this rule only applies inside the bar's own columns, and
+     the deep top margin was the other place its height was going */
   .roofbar label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
-    color:var(--muted);margin:10px 0 4px}
+    color:var(--muted);margin:6px 0 4px}
   .roofbar .rbchk{display:flex;align-items:center;gap:4px;margin:0;
     text-transform:none;letter-spacing:0;font-size:12px}
   .roofbar select,.roofbar input[type=number]{
@@ -207,6 +212,7 @@
   button.split>span[data-half="line"],
   button.split>span[data-half="cut"],
   button.split>span[data-half="form"],
+  button.split>span[data-half="undo"],
   button.split>span[data-half="ebox"],
   button.split>span[data-half="ebrush"],
   button.split>span[data-half="eline"]{flex:0 0 26px;border-left:1px solid var(--line);
@@ -228,7 +234,23 @@
      box under Mode would make the bar taller, which is the opposite of what
      this build is for. Fixed, not minimum: a growing hint makes the sticky
      bar taller and fit() rescales the drawing under it. */
-  #ptHint{width:152px;white-space:normal;height:3.9em;overflow:hidden}
+  /* NO RESERVED HEIGHT (21n). This was 3.9em of paragraph in the tallest
+     column of the bar, and on the iPad the bar is eating the canvas. The
+     element stays -- ptSay's working messages go through it -- but it costs
+     nothing at rest, and the reason the height was reserved (the panel
+     changing size as the text changed) no longer applies: the column's
+     width is fixed and the sentence is one short line. */
+  /* ONE LINE, FIXED (21n). It was 3.9em of reserved paragraph in the tallest
+     column of the bar, and on the iPad the bar is eating the canvas. The
+     invariant that mattered stays -- a FIXED width and a FIXED height, so
+     no message can grow the bar and rescale the drawing under it -- but the
+     height is now a single line, and the sentence that overruns it is cut
+     with an ellipsis and carried in full on the tooltip. */
+  /* THE COMMENTARY IS A TOOLTIP NOW (21o). Even one line of it was canvas
+     on the iPad, and it was mostly telling George things he has known for
+     months. ptSay still writes the element and still puts the full sentence
+     in its title, so a long press reads it; it holds no height. */
+  #ptHint{display:none}
   .roofbar .readout{max-height:190px;overflow-y:auto;font-size:11px;padding:9px}
   .roofdock .hint{font-size:11px;line-height:1.45}
   .roofdock .readout{max-height:200px;overflow-y:auto;font-size:11px;padding:9px}
@@ -388,8 +410,10 @@
       <div class="rbpair" style="margin-top:4px">
         <button id="itSelect" class="ghost"
                 title="Pick items up and move them">Select</button>
-        <button id="rulerBtn" class="ghost"
-                title="Drag on the map to measure a distance. Measurements are working marks — they are never exported.">Measure</button>
+        <button id="rulerBtn" class="ghost split"
+                title="Drag on the map to measure a distance. Measurements are working marks — they are never exported."><span data-half="rect" id="rulerLab">Measure</span><span
+                id="rulerUndo" data-half="undo" style="display:none"
+                title="Take back the last measurement, and nothing else">↶</span></button>
         <button id="ptUndo" class="ghost" disabled
                 title="Take back the last thing done — a point, an item, a rub, a measurement, a cut">Undo</button>
       </div>
@@ -398,7 +422,7 @@
            column is tall, so the sentence fills a gap instead of pushing
            the bar down. Same element, same writer (ptSay) -- moved, not
            copied. -->
-      <div class="hint" id="ptHint" style="margin-top:6px">Plot line cuts a parcel in two. Hedge, drive, path and decking are dragged out as a rectangle and stop at the plot edge, the road and any building. Decking is boarded square to the plot.</div>
+      <div class="hint" id="ptHint"></div>
     </div>
     <div class="rbcol" id="plotItemsCol">
       <span class="rblab">Plot items</span>
@@ -9701,7 +9725,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-21l';
+const BUILD='build 2026-08-21r';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -9745,6 +9769,87 @@ function featureArea(f){
   };
   if(g.type==='MultiPolygon') return g.coordinates.reduce((t,p)=>t+one(p),0);
   return g.coordinates.length?one(g.coordinates):0;
+}
+/* ============ THE AREA, WRITTEN ON THE PLOT ITSELF (21q) ==============
+   Each highlighted plot carries its own area in the middle of it. It is an
+   ANNOTATION, not working chrome: it goes on the sheet as well as the
+   screen, because a plan of a garden with the area written on it is the
+   point of writing it down. Dragged where he wants it, and where he put it
+   travels with the session -- keyed by TOID where there is one, so it stays
+   with the plot rather than with a position in the list. */
+let AREALAB={}, AREADRAG=null, AREAHITS=[];
+function areaLabKey(i){
+  const f=AREAS[i];
+  return (f&&f.properties&&f.properties.TOID)?('t:'+f.properties.TOID):('i:'+i);
+}
+function areaLabAt(i){
+  const f=AREAS[i];
+  if(!f) return null;
+  const rs=rings(f.geometry);
+  if(!rs.length) return null;
+  /* the biggest ring is the plot; the others are its holes */
+  let big=rs[0], ba=Math.abs(ringArea(rs[0]));
+  for(const r of rs){ const a=Math.abs(ringArea(r)); if(a>ba){ ba=a; big=r; } }
+  const c=centroidOf(big);
+  const off=AREALAB[areaLabKey(i)]||[0,0];
+  return [c[0]+off[0], c[1]+off[1]];
+}
+function areaLabText(i){
+  const f=AREAS[i];
+  return f?(featureArea(f).toFixed(1)+' m\u00b2'):'';
+}
+/* which label a press landed on -- boxes from the last live render, the
+   same convention the roof name chips use */
+function areaLabHit(ox,oy){
+  if(!VIEW||!AREAHITS.length) return null;
+  const [fx,fy]=pxScale();
+  const x=ox*fx, y=oy*fy;
+  for(const b of AREAHITS)
+    if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h) return b.i;
+  return null;
+}
+function drawAreaLabels(g,X,Y,k,live){
+  if(live) AREAHITS.length=0;
+  if(typeof selAll!=='function') return;
+  const list=selAll();
+  if(!list.length) return;
+  g.save();
+  for(const i of list){
+    const p=areaLabAt(i);
+    if(!p) continue;
+    const px=X(p[0],p[1]), py=Y(p[0],p[1]);
+    const big=areaLabText(i);
+    const cap='Approximate area';
+    g.textAlign='center'; g.textBaseline='middle';
+    g.font=(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    const mc=g.measureText(cap);
+    const wc=(mc&&isFinite(mc.width))?mc.width:cap.length*5.5*k;
+    g.font='600 '+(13*k)+'px ui-monospace,Menlo,monospace';
+    const mb=g.measureText(big);
+    const wb=(mb&&isFinite(mb.width))?mb.width:big.length*8*k;
+    const w=Math.max(wc,wb)+14*k, h=34*k;
+    const x0=px-w/2, y0=py-h/2;
+    /* NO BOX (21r): the caption and the figure stand on the drawing on their
+       own. The press box is unchanged -- it is where the words are, which is
+       all the panel was ever marking. A thin light halo is laid under the
+       text instead, so it stays readable over decking or tarmac without
+       drawing a frame round itself. */
+    g.lineJoin='round';
+    g.strokeStyle='rgba(253,252,249,0.85)';
+    g.lineWidth=3*k;
+    g.strokeText(cap,px,y0+11*k);
+    g.font='600 '+(13*k)+'px ui-monospace,Menlo,monospace';
+    g.strokeText(big,px,y0+24*k);
+    g.font=(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    g.fillStyle='#6b6860';
+    g.font=(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    g.fillText(cap,px,y0+11*k);
+    g.fillStyle='#1c1c1a';
+    g.font='600 '+(13*k)+'px ui-monospace,Menlo,monospace';
+    g.fillText(big,px,y0+24*k);
+    if(live) AREAHITS.push({i:i,x:x0,y:y0,w:w,h:h});
+  }
+  g.restore();
 }
 function selArea(){
   let t=0;
@@ -10655,24 +10760,31 @@ const RECT_SNAP_PX=10;
 const RECT_SNAP_M=0.25;
 function snapRectPt(p){
   const out={pt:[p[0],p[1]], su:false, sv:false};
-  if(!PLOTITEMS.length) return out;
   const bs=$('ptBoxSnap');
   if(bs&&!bs.checked) return out;              // the tick turns it off
   const S=(typeof VIEW==='object'&&VIEW&&VIEW.S)?VIEW.S:40;
   const tol=Math.min(RECT_SNAP_PX/S,RECT_SNAP_M);
+  /* THE MAP'S OWN LINES COUNT, NOT JUST THE ITEMS (21m). George's picture is
+     two building footprints meeting, with the line between them the thing a
+     path should be set against -- and the box tool was reading laid items
+     alone, so the walls of the house were invisible to it. boundaryRings
+     already gathers what may be drawn against: the highlighted parcels, the
+     buildings, and every laid item. */
+  const rings=(typeof boundaryRings==='function')?boundaryRings():[];
   const ca=Math.cos(ROT), sa=Math.sin(ROT);
   const ux=[ca,-sa], uy=[-sa,-ca];               // rectRing's own axes
   const U=q=>q[0]*ux[0]+q[1]*ux[1];
   const V=q=>q[0]*uy[0]+q[1]*uy[1];
   let u=U(p), v=V(p), du=tol, dv=tol;
-  for(const it of PLOTITEMS){
-    const rs=it.rings||(it.ring?[it.ring]:[]);
-    for(const r of rs) for(const q of r){
-      const cu=U(q), cv=V(q);
-      const eu=Math.abs(cu-u), ev=Math.abs(cv-v);
-      if(eu<du){ du=eu; out.su=true; u=cu; }
-      if(ev<dv){ dv=ev; out.sv=true; v=cv; }
-    }
+  /* Corners, independently per axis: a coordinate is offered wherever along
+     the line the box happens to be, which is what catches the line BETWEEN
+     two shapes -- it is shared by the corners that define it. An edge pass
+     was written for that case and could not be made to fail; it went. */
+  for(const r of rings) for(const q of r){
+    const cu=U(q), cv=V(q);
+    const eu=Math.abs(cu-u), ev=Math.abs(cv-v);
+    if(eu<du){ du=eu; out.su=true; u=cu; }
+    if(ev<dv){ dv=ev; out.sv=true; v=cv; }
   }
   if(!out.su&&!out.sv) return out;
   out.pt=[u*ux[0]+v*uy[0], u*ux[1]+v*uy[1]];
@@ -10806,33 +10918,46 @@ function drawDeckGrain(g,rings,X,Y,k,turned){
   /* TURNED: the two axes swap, so the boards run the other way and the
      grain, the gaps and the seeds all follow without a second code path */
   if(turned){ const t0=ux; ux=uy; uy=t0; }
+  /* ONE GRID FOR THE WHOLE PLAN (21m). The centre used to come from THIS
+     deck's own bounds, so a second deck laid against the first started its
+     boards wherever its own middle fell and the two never lined up. The
+     grid is anchored to the PLOT instead -- the origin of map coordinates,
+     which every deck on the drawing shares -- and this deck simply draws
+     the part of that grid it covers. Turned decking gets its own grid, also
+     anchored to the plot, so two areas running different ways each stay
+     self-consistent. */
   const c=[(lo[0]+hi[0])/2,(lo[1]+hi[1])/2];
   const span=Math.hypot(hi[0]-lo[0],hi[1]-lo[1])/2+0.5;
-  const P=(u,v)=>[c[0]+ux[0]*u+uy[0]*v, c[1]+ux[1]*u+uy[1]*v];
+  const P=(u,v)=>[ux[0]*u+uy[0]*v, ux[1]*u+uy[1]*v];
   const pitch=DECK_BOARD+DECK_GAP;
-  const n=Math.ceil(span/pitch);
-  if(n>400) return;                          // zoomed too far out to be worth it
+  /* the strip of the shared grid this deck actually needs */
+  const cu=c[0]*ux[0]+c[1]*ux[1], cv=c[0]*uy[0]+c[1]*uy[1];
+  const i0=Math.floor((cv-span)/pitch), i1=Math.ceil((cv+span)/pitch);
+  const uLo=cu-span, uHi=cu+span;
+  if(i1-i0>800) return;                      // zoomed too far out to be worth it
   /* the gap between boards, as a line rather than a filled sliver: at plot
      scale a 5 mm board gap is well under a pixel and a line reads better */
   g.lineWidth=Math.max(0.6,0.9*k);
   g.strokeStyle='rgba(60,44,26,0.55)';
-  for(let i=-n;i<=n;i++){
+  for(let i=i0;i<=i1;i++){
     const v=i*pitch;
-    const a=P(-span,v), b=P(span,v);
+    const a=P(uLo,v), b=P(uHi,v);
     g.beginPath(); g.moveTo(X(a[0],a[1]),Y(a[0],a[1]));
     g.lineTo(X(b[0],b[1]),Y(b[0],b[1])); g.stroke();
   }
   /* grain: shallow strokes ALONG the boards, two or three to a board, each
      one short of the board's width so the boards still read as separate */
   g.lineWidth=Math.max(0.5,0.7*k);
-  for(let i=-n;i<=n;i++){
+  for(let i=i0;i<=i1;i++){
     const v=i*pitch+DECK_BOARD/2;
     for(let j=0;j<3;j++){
+      /* the seed is the board's own v, which is a plot coordinate now, so
+         the same board carries the same grain wherever it is drawn from */
       const r1=deckSeed(v,j), r2=deckSeed(v+7.77,j*3+1);
-      const u0=-span+((r1+j)/3)*2*span;
-      const len=span*(0.25+0.5*r2);
+      const u0=uLo+((r1+j)/3)*(uHi-uLo);
+      const len=(uHi-uLo)*(0.25+0.5*r2);
       const off=(r2-0.5)*DECK_BOARD*0.5;
-      const a=P(u0,v+off), b=P(Math.min(span,u0+len),v+off);
+      const a=P(u0,v+off), b=P(Math.min(uHi,u0+len),v+off);
       g.strokeStyle='rgba(70,50,28,'+(0.10+0.14*r1).toFixed(3)+')';
       g.beginPath(); g.moveTo(X(a[0],a[1]),Y(a[0],a[1]));
       g.lineTo(X(b[0],b[1]),Y(b[0],b[1])); g.stroke();
@@ -11211,9 +11336,20 @@ function paintPlotItems(g,X,Y,k,live){
       g.closePath();
     });
     /* A quiet edge so a drive on grey tarmac does not melt into a path.
-       Stroked under the fill, at double width, so half of it survives. */
-    g.strokeStyle='rgba(40,42,40,0.35)'; g.lineWidth=2*k; g.stroke();
+       CLIPPED TO ITS OWN SHAPE (21p). A canvas stroke is centred on the
+       path, so half of this line lay OUTSIDE the item -- on whatever it was
+       laid against. The fill covers the inside half and nothing covered the
+       outside half, so the item drawn last showed a dark lip a pixel wide
+       over the item drawn first: George's path sitting slightly over his
+       patio. Measured on his save first -- the two shapes share their edge
+       to within 0.6 mm, so the snapping was never the fault. Clipped, only
+       the inside half is drawn: same edge, same weight where it shows,
+       nothing over the border. */
+    g.save();
+    g.clip();
+    g.strokeStyle='rgba(40,42,40,0.35)'; g.lineWidth=4*k; g.stroke();
     g.fillStyle=COL[t]||COL.path; g.fill();
+    g.restore();
     /* DECKING GETS ITS BOARDS. Drawn inside the shape it has just filled,
        clipped to it, so a run painted with the brush is boarded to its own
        outline rather than to a bounding box. */
@@ -12465,6 +12601,8 @@ function renderScene(g,W,H,live,scale,skipFurniture){
      plan, the rulers and the ridge measurements are tools, not the sheet, so
      they stay legible through it. */
   if(live) try{ drawHaloPreview(g,W,H,view); }catch(_){}
+  /* the area labels are ANNOTATION: both passes, so the sheet carries them */
+  try{ drawAreaLabels(g,X,Y,k||1,!!live); }catch(_){}
   if(live) try{ drawRidgeMeasure(g,X,Y,k||1); }catch(_){}
   /* the item's own dimensions, on the same terms: working chrome, screen
      only, never on the sheet */
@@ -13474,7 +13612,11 @@ function exportPng(){
   g.fillStyle='#1c1c1a'; g.font='600 30px system-ui,-apple-system,"Segoe UI",sans-serif';
   g.fillText(title.length>62?title.slice(0,61)+'…':title,RIGHT,M+50);
 
-  let sub='EPSG:27700  ·  E '+PT[0].toFixed(1)+'  N '+PT[1].toFixed(1)+'  ·  '+(2*HALF)+' m box';
+  /* 21q: the projection name and the box size went from this line -- neither
+     means anything to whoever reads the sheet. The grid reference and the
+     plot area stay. (The name is not written here even in a comment: the
+     gate that checks it is gone reads this function's source.) */
+  let sub='E '+PT[0].toFixed(1)+'  ·  N '+PT[1].toFixed(1);
   if(SEL>=0){
     const a=rings(AREAS[SEL].geometry).reduce((s,r)=>s+ringArea(r),0);
     /* the printed figure sums the highlight too, or an export contradicts
@@ -13709,16 +13851,41 @@ $('alignItems').onclick=()=>{
 /* The ruler is a mode, so it says so on the button and turns the other
    rectangle tools off -- two tools armed at once is a way to lose work, which
    is the same reason setPlotMode already stands them down. */
+/* A MEASUREMENT UNDO OF ITS OWN (21n). The general Undo walks the whole
+   stack, so reaching one stray ruler could mean undoing a dozen items first.
+   This takes back the last measurement and touches nothing else. */
+function rulerUndoLast(){
+  if(!RULERS.length) return false;
+  const was=RULERS.slice();
+  RULERS.pop();
+  pushRedo('the measurement you took back',()=>{ RULERS=was.slice(); syncRuler(); draw(); });
+  syncRuler(); draw();
+  return true;
+}
 function syncRuler(){
   /* THE MEASUREMENTS' OWN CLEAR IS GONE (21j). Every measurement goes on
      the undo stack as it is taken, and Undo -- which now sits where that
      button did -- takes them back one at a time, which is the more useful
      of the two. */
-  const b=$('rulerBtn');
-  if(b){ b.classList.toggle('on',!!RULERMODE);
-         b.textContent=RULERMODE?'Measuring':'Measure'; }
+  const b=$('rulerBtn'), lab=$('rulerLab');
+  if(b) b.classList.toggle('on',!!RULERMODE);
+  if(lab) lab.textContent=RULERMODE?'Measuring':'Measure';
+  /* THE UNDO ARROW LIVES INSIDE THE MEASURE BUTTON (21r), on its right, and
+     shows itself only once there is a measurement to take back. */
+  const u=$('rulerUndo');
+  if(u) u.style.display=RULERS.length?'':'none';
 }
-$('rulerBtn').onclick=()=>{
+/* the arrow is a half of the Measure button now, so its press arrives at
+   that button's handler; this stays for anything that clicks it directly */
+if($('rulerUndo')) $('rulerUndo').onclick=()=>{
+  if(rulerUndoLast()) say('Last measurement taken back.');
+};
+$('rulerBtn').onclick=(e)=>{
+  const half=(e&&e.target&&e.target.dataset)?e.target.dataset.half:null;
+  if(half==='undo'){
+    if(rulerUndoLast()) say('Last measurement taken back.');
+    return;
+  }
   RULERMODE=!RULERMODE;
   RULERDRAG=null;
   if(RULERMODE){
@@ -14041,7 +14208,9 @@ function alignFrontWall(){
   const ry=rel[0]*Math.sin(rot)+rel[1]*Math.cos(rot);   // screen-up component
   if(ry>0) rot+=Math.PI;
   ROT=rot; FRONTAZ=rot; setRotUi();
-  $('roofHint').textContent='Front wall level, road at the bottom. Snapping is square to this wall.';
+  /* NOTHING SAID (21n): the Auto button going in is the confirmation, and a
+     line of prose here pushed the whole bar down on the iPad. */
+  $('roofHint').textContent='';
   return true;
 }
 let FRONTAZ=0;
@@ -24949,9 +25118,13 @@ function setPlotMode(t,tool){
   if(PLOTMODE&&typeof ERASEMODE!=='undefined'&&(ERASEMODE||LINECUT)){
     ERASEMODE=null; ERASEDRAG=null; LINECUT=null;
   }
-  /* the run pen is put away whenever the armed tool changes, or a half-drawn
-     run would land as the wrong type the next time a point went down */
-  if(DRAW&&DRAW.kind==='plotrun'){ DRAW=null; PENHOVER=null; }
+  /* THE PEN IS PUT AWAY WHENEVER THE ARMED TOOL CHANGES -- BOTH PENS.
+     A half-drawn run would land as the wrong type the next time a point went
+     down; and an unformed PLOT LINE used to sit in DRAW for ever, so picking
+     another item and coming back to Plot line carried on from wherever it
+     had been left. Points not formed are not work in progress once the tool
+     has been put down. */
+  if(DRAW&&isPlotPen(DRAW.kind)){ DRAW=null; PENHOVER=null; }
   if(PLOTMODE&&PLOTTOOL==='line'){
     DRAW={kind:'plotrun',t:PLOTMODE,w:BRUSH_W[PLOTMODE]||0.6,pts:[]};
   }
@@ -25645,7 +25818,14 @@ $('ptClear').onclick=(e)=>{
   if(!pen&&!PLOTITEMS.length&&!ERASEMODE&&!LINECUT) return;
   if(ERASEMODE||LINECUT){ setEraseMode(null,true); LINECUT=null; ptSay('Tool put away.'); }
   else if(pen){ DRAW=null; ptSay('Plot line abandoned.'); }
-  else PLOTITEMS=[];
+  else if(PLOTITEMS.length){
+    /* CLEAR IS UNDOABLE (21m). It threw the lot away with nothing to put it
+       back, which is the worst kind of button to get wrong. */
+    const was=PLOTITEMS.slice();
+    PLOTITEMS=[];
+    pushRedo('the items you cleared',()=>{ PLOTITEMS=was.slice(); });
+    ptSay('Everything cleared.','Undo brings it all back.');
+  }
   syncPlotItems(); draw();
 };
 function setMode(m){
@@ -25996,6 +26176,8 @@ function sessionPayload(){
         rot:GHOST.rot||0, opacity:GHOST.opacity==null?0.45:GHOST.opacity,
         show:!!GHOST.show, cx:GHOST.cx, cy:GHOST.cy,
         region:GHOST.region?{w:GHOST.region.w,h:GHOST.region.h}:null}:null,
+      areaLabels:Object.keys(AREALAB).reduce((o,k2)=>{
+        o[k2]=[+AREALAB[k2][0].toFixed(3),+AREALAB[k2][1].toFixed(3)]; return o; },{}),
       plotItems:PLOTITEMS.map(it=>(it.type==='access'
         /* an access marker is two points and a direction, not an outline: the
            rings-only shape would have saved it as an empty item */
@@ -26086,6 +26268,11 @@ function restoreSession(j){
     im.src=gh.img;
     ghostSyncPanel();
   } else ghostSyncPanel&&ghostSyncPanel();
+  AREALAB={};
+  if(S.areaLabels) for(const k2 in S.areaLabels){
+    const v=S.areaLabels[k2];
+    if(Array.isArray(v)&&isFinite(v[0])&&isFinite(v[1])) AREALAB[k2]=[+v[0],+v[1]];
+  }
   PLOTITEMS=(S.plotItems||[]).map(it=>(it.type==='access'&&it.a&&it.b
     ? {type:'access', a:it.a.slice(), b:it.b.slice(),
        into:(it.into||[0,1]).slice()}
@@ -26510,6 +26697,22 @@ canvas.addEventListener('pointerdown',e=>{
     accessClick([amx,amy]);
     draw(); return;
   }
+  if(MODE==='plot'&&VIEW&&!LINECUT&&!ERASEMODE&&!SELADD
+     &&!(DRAW&&isPlotPen(DRAW.kind))){
+    /* The area label comes to hand before any tool does: a press on a label
+       is a press on the label. NOT while Add plots is armed, though -- the
+       label sits in the middle of the plot, which is exactly where a finger
+       goes to pick that plot, and choosing plots is what that mode is for. */
+    const hit=areaLabHit(ox,oy);
+    if(hit!=null){
+      const [mx,my]=screenToMap(ox,oy);
+      const at=areaLabAt(hit);
+      AREADRAG={i:hit,gx:at[0]-mx,gy:at[1]-my,
+                from:(AREALAB[areaLabKey(hit)]||[0,0]).slice()};
+      try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+      return;
+    }
+  }
   if(MODE==='plot'&&LINECUT){
     /* the cut's first end, snapped like any placed point */
     const [mx,my]=screenToMap(ox,oy);
@@ -26648,6 +26851,20 @@ canvas.addEventListener('pointermove',e=>{
     const r0=canvas.getBoundingClientRect();
     PLOTPAINT.pts.push(screenToMap(e.clientX-r0.left,e.clientY-r0.top));
     draw(); return;
+  }
+  if(AREADRAG&&VIEW){
+    const r0=canvas.getBoundingClientRect();
+    const [mx,my]=screenToMap(e.clientX-r0.left,e.clientY-r0.top);
+    const i=AREADRAG.i, f=AREAS[i];
+    if(f){
+      const rs=rings(f.geometry);
+      let big=rs[0], ba=Math.abs(ringArea(rs[0]));
+      for(const r of rs){ const a=Math.abs(ringArea(r)); if(a>ba){ ba=a; big=r; } }
+      const c=centroidOf(big);
+      AREALAB[areaLabKey(i)]=[mx+AREADRAG.gx-c[0], my+AREADRAG.gy-c[1]];
+      draw();
+    }
+    return;
   }
   if(LINECUT&&LINECUT.a){
     const r0=canvas.getBoundingClientRect();
@@ -26802,6 +27019,14 @@ canvas.addEventListener('pointerup',e=>{
     });
     syncRuler();
     say('Measured '+rulerLabel(L)+'. Measurements are not exported.');
+    draw(); return;
+  }
+  if(AREADRAG){
+    const D=AREADRAG; AREADRAG=null;
+    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+    const now=(AREALAB[areaLabKey(D.i)]||[0,0]).slice();
+    if(Math.hypot(now[0]-D.from[0],now[1]-D.from[1])>1e-9)
+      pushRedo('the area label you moved',()=>{ AREALAB[areaLabKey(D.i)]=D.from.slice(); });
     draw(); return;
   }
   ITEMMEAS=null;                              // the dimensions go with the gesture
