@@ -189,8 +189,13 @@
      said nothing worth a line of the bar, and George wanted the bar to end
      under the buttons. Empty means gone; the margin lives on the line
      itself, so an empty one costs no height either. */
-  #roofHint{margin-top:4px;margin-bottom:0}
-  #roofHint:empty{display:none}
+  /* THE TOOL MESSAGES LEAVE THE BAR (21x). Empty-means-gone was not enough:
+     the line is rarely empty -- every tool writes to it -- so it held a row
+     under the buttons most of the time. The messages are worth keeping, so
+     they are mirrored to the status line in the left panel, which is off
+     the bar and exists for exactly this. The element stays and is still
+     written, so everything that reads it is untouched. */
+  #roofHint{display:none}
   /* 6px, not 10: this rule only applies inside the bar's own columns, and
      the deep top margin was the other place its height was going */
   .roofbar label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
@@ -424,7 +429,8 @@
                 id="rulerUndo" data-half="undo" style="visibility:hidden"
                 title="Take back the last measurement, and nothing else">↶</span></button>
         <button id="ptUndo" class="ghost" disabled
-                title="Take back the last thing done — a point, an item, a rub, a measurement, a cut">Undo</button>
+                title="Take back the last thing done — a point, an item, a rub, an outline, a cut">Undo</button>
+        <button id="redoBtn" class="ghost" disabled>Redo</button>
       </div>
       <!-- The plot items line reads here, under Measure and Clear, where
            George wanted it: the Mode column is short and the Plot items
@@ -451,10 +457,8 @@
       <div class="rbcol">
         <span class="rblab">Outline</span>
         <div class="rbpair">
-          <button id="drawMain" class="ghost">Main</button>
-          <button id="drawExt" class="ghost">Extension</button>
-          <button id="drawUndo" class="ghost">Undo</button>
-          <button id="redoBtn" class="ghost" disabled>Redo</button>
+          <button id="drawMain" class="ghost"
+                  title="Draw an outline. The first on an empty map is the main roof; every one after it is an extension.">Outline</button>
           <button id="drawClear" class="ghost">Clear</button>
         </div>
         <label class="rbchk"><input type="checkbox" id="snapOn" checked> snap</label>
@@ -575,12 +579,7 @@
         <button id="itemDel" class="ghost" disabled>Remove</button>
         <button id="editOpen" class="ghost">Edit</button>
       </div>
-      <div class="row" id="brushOpts" style="display:none;margin:6px 0 0;gap:4px">
-        <label style="margin:0;font-size:11px;white-space:nowrap">Brush width</label>
-        <input type="number" id="ptBrushW" min="0.2" max="6" step="0.1" value="0.6"
-               style="margin:0;width:64px" title="Finished width of the painted run, in metres">
-        <span style="font:11px ui-monospace,Menlo,monospace">m</span>
-      </div>
+
       <!-- THE FOLLOW, a tick like a snap: two points placed on a plot line
            and the run goes the way the line goes between them. -->
       <label class="rbchk" id="ptFollowWrap" style="display:none;margin:6px 0 0;font-size:11px"
@@ -686,7 +685,7 @@
         <div id="ghostStat" style="font-size:11px;color:#8a897f;margin:2px 0 0">No plan loaded.</div>
       </div>
     </div>
-    <div class="rbcol">
+    <div class="rbcol" id="keysCol" style="display:none">
       <span class="rblab">Keys</span>
       <div style="position:relative">
         <button id="keyBtn" class="ghost" style="margin:0;padding:4.5px 7.2px;font-size:10.8px"
@@ -708,7 +707,9 @@
     </div>
     <div class="rbcol">
       <span class="rblab">Export</span>
-      <div class="rbpair">
+      <!-- ONE COLUMN, NOT A PAIR (21w): the block is narrow rather than
+           wide, which is what the bar is short of once it wraps. -->
+      <div class="rbpair" style="grid-template-columns:minmax(74px,1fr)">
         <button id="roofExport" class="ghost" disabled>Roof JSON</button>
         <button id="exportPng" class="ghost" disabled>Map PNG</button>
         <label class="rbchk" id="haloWrap"
@@ -730,8 +731,8 @@
     <label for="loc">Location — address, postcode, grid ref, "lat, long" or "E, N"</label>
     <input type="text" id="loc" placeholder="SK3290387766  ·  347 Haggstones Rd, Sheffield S35 0PB" spellcheck="false">
     <a id="grflink" href="https://gridreferencefinder.com/" target="_blank" rel="noopener noreferrer">Look up a grid reference →</a>
-    <div class="keep"><input type="checkbox" id="places"><label for="places" style="margin:0;text-transform:none;letter-spacing:0">use OS Places for house-number accuracy — <b>billed per lookup, outside the £1,000 allowance</b></label></div>
-    <div class="hint">A pasted grid ref is exact and costs nothing. Otherwise: Nominatim for the address, cross-checked against the postcode centroid from postcodes.io.</div>
+    <div class="keep"><input type="checkbox" id="places"><label for="places" style="margin:0;text-transform:none;letter-spacing:0"
+      title="House-number accuracy from OS Places. Billed per lookup, outside the £1,000 allowance — a pasted grid reference is exact and costs nothing.">use OS Places</label></div>
 
     <label>Search box (half-width, metres)</label>
     <div class="row"><input type="range" id="half" min="15" max="65" step="5" value="20"><span class="val" id="halfval">20 m</span></div>
@@ -778,6 +779,23 @@
   </div>
 
 
+  <!-- THE BRUSH PANEL (21w). Off the bar and onto the map, bottom left,
+       shown only while a brush or a clicked run is armed. A slider as well
+       as the box, because a slider is what a thumb wants. -->
+  <!-- PINNED TO THE SCREEN, not the page (21x): positioned against the map
+       it scrolled away on a long page and had to be chased. -->
+  <div id="plotPop" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;
+       padding:8px 10px;background:#fdfcf9;border:1px solid #d9d6cc;border-radius:8px;
+       box-shadow:0 6px 18px rgba(0,0,0,.14);min-width:186px">
+    <div class="row" id="brushOpts" style="margin:0;gap:6px;align-items:center">
+      <label style="margin:0;font-size:11px;white-space:nowrap">Width</label>
+      <input type="range" id="ptBrushSlide" min="0.2" max="6" step="0.1" value="0.6"
+             style="margin:0;flex:1" title="Finished width of the painted run, in metres">
+      <input type="number" id="ptBrushW" min="0.2" max="6" step="0.1" value="0.6"
+             style="margin:0;width:58px" title="Finished width of the painted run, in metres">
+      <span style="font:11px ui-monospace,Menlo,monospace">m</span>
+    </div>
+  </div>
   <button id="sideGrip" class="sidegrip" type="button" title="Hide the panel">&#9664;</button>  <div class="mapwrap">
     <canvas id="map"></canvas>
     <div class="zoomctl">
@@ -9734,7 +9752,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-21t';
+const BUILD='build 2026-08-22a';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -13581,7 +13599,9 @@ function exportPng(){
      estimate gives. Centred in a 196 strip it overflowed by 21 px and in a
      248 strip it cleared by only 5, which is thinner than the text metrics
      are trustworthy to. 264 leaves about 13 px at the worst rotation. */
-  const M=1600, FOOT=264, k=M/620;      // k scales linework up from screen sizing
+  /* 300, not 264: the notice below is one line of 15px text with a lead
+     above it, and the credit keeps its 24px from the bottom edge. */
+  const M=1600, FOOT=300, k=M/620;      // k scales linework up from screen sizing
   const c=document.createElement('canvas');
   c.width=M; c.height=M+FOOT;
   const g=c.getContext('2d');
@@ -13600,7 +13620,13 @@ function exportPng(){
        the export for a layer that is barely there; this uses the one render
        twice, faint underneath and full strength on top after the mask has
        taken its bite. */
-    if(MASKFILL>0){
+    /* NOT UNDER THE HALO (21u). The wash is the whole scene at low alpha,
+       laid down before the mask takes its bite -- right for the brush mask,
+       where showing the context faintly is the point. Under the halo it
+       left the neighbourhood showing to the edge of the sheet, when the
+       halo's whole job is to fade to nothing: beyond the fade there should
+       be paper. */
+    if(MASKFILL>0&&!halo){
       g.save();
       g.globalAlpha=Math.max(0,Math.min(1,MASKFILL));
       g.drawImage(mc,0,0);
@@ -13648,7 +13674,17 @@ function exportPng(){
      would leave the row ending 42 px short of the margin and looking
      misaligned against the text above it. */
   const PAD=32, RIGHT=M-PAD, PADL=PAD;
-  const title=($('loc').value.trim()||'OS MasterMap extract');
+  /* THE PLACE IS NAMED ONCE (21w). Paste a grid pair into the location box
+     -- which is what George does -- and the title said the same numbers the
+     labelled E/N line below already says. A bare pair is not a title. */
+  const rawTitle=$('loc').value.trim();
+  const barePair=/^\s*-?\d{4,7}(\.\d+)?\s*,\s*-?\d{4,7}(\.\d+)?\s*$/.test(rawTitle);
+  /* 21y: with no address to title the sheet by, the grid reference IS the
+     title, and the line below carries the plot area alone -- the numbers
+     are printed once, and 'OS MasterMap extract' says nothing. */
+  const gridTitle='E '+PT[0].toFixed(1)+'  ·  N '+PT[1].toFixed(1);
+  const noAddress=barePair||!rawTitle;
+  const title=noAddress?gridTitle:rawTitle;
   g.textAlign='right';
   g.fillStyle='#1c1c1a'; g.font='600 30px system-ui,-apple-system,"Segoe UI",sans-serif';
   g.fillText(title.length>62?title.slice(0,61)+'…':title,RIGHT,M+50);
@@ -13657,12 +13693,14 @@ function exportPng(){
      means anything to whoever reads the sheet. The grid reference and the
      plot area stay. (The name is not written here even in a comment: the
      gate that checks it is gone reads this function's source.) */
-  let sub='E '+PT[0].toFixed(1)+'  ·  N '+PT[1].toFixed(1);
+  let sub=noAddress?'':('E '+PT[0].toFixed(1)+'  ·  N '+PT[1].toFixed(1));
   if(SEL>=0){
     const a=rings(AREAS[SEL].geometry).reduce((s,r)=>s+ringArea(r),0);
     /* the printed figure sums the highlight too, or an export contradicts
        the panel it was made from */
-    sub+='  ·  selected plot '+selArea().toFixed(1)+' m²'
+    /* 21z: APPROXIMATE, and said so. The figure is MasterMap's polygon, not
+       a survey, and the label on the plot itself has said so since 21q. */
+    sub+=(sub?'  ·  ':'')+'selected plot approx. '+selArea().toFixed(1)+' m²'
       +(selAll().length>1?' ('+selAll().length+' plots)':'');
   }
   g.fillStyle='#6d6c66'; g.font='21px ui-monospace,Menlo,Consolas,monospace';
@@ -13759,6 +13797,29 @@ function exportPng(){
       drawMapFurniture(g,M,M,fv.S,fk,PADL,M+FOOT/2+46*fk,k*BAR_BUDGET_K);
       g.restore();
     }
+  }
+  /* THE NOTICE (22a). George's wording, at 15px in the same muted grey as
+     the grid line, above the credit -- a footnote, not a warning. Written in
+     one line and shrunk to fit rather than wrapped: the strip is 1536 px
+     wide inside its margins and the sentence is comfortably shorter than
+     that at 15px, but a narrower page must not push it off the edge. */
+  {
+    const notice='Not a survey. For visual guidance only. Areas and boundaries are '
+      +'approximate, derived from OS MasterMap and site sketching, and define no legal '
+      +'boundary or title. Not to be relied on for conveyancing, planning or construction. '
+      +'OS data \u00a9 Crown copyright and database right.';
+    g.fillStyle='#96948c';
+    g.textAlign='right';
+    let px=15;
+    g.font=px+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    const room=M-PAD-PADL;
+    let w=g.measureText(notice).width;
+    while(w>room&&px>10){
+      px-=0.5;
+      g.font=px+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+      w=g.measureText(notice).width;
+    }
+    g.fillText(notice,RIGHT,M+FOOT-50);
   }
   g.fillStyle='#96948c'; g.font='18px system-ui,-apple-system,"Segoe UI",sans-serif';
   g.textAlign='right';
@@ -14530,8 +14591,6 @@ const HOTKEY_DEFAULTS=[
   /* ---- plot ---- */
   {id:'ptLine',    label:'Plot line',      scope:'plot', key:'l',
    note:'P went to Path; plot Line'},
-  {id:'ptClear',   label:'Erase (clicked)', scope:'plot', key:'e', half:'eline',
-   note:'E is Select on the roof; the table is scoped, so plot mode has it'},
   {id:'ptHedge',   label:'Hedge',          scope:'plot', key:'h'},
   {id:'ptDrive',   label:'Drive',          scope:'plot', key:'d'},
   {id:'ptPath',    label:'Path',           scope:'plot', key:'p'},
@@ -14542,10 +14601,8 @@ const HOTKEY_DEFAULTS=[
   {id:'ptAccess',  label:'Access',         scope:'plot', key:'a'},
   {id:'ptForm',    label:'Form',           scope:'plot', key:'f'},
   /* ---- roof ---- */
-  {id:'drawMain',  label:'Main outline',   scope:'roof', key:'n',
-   note:'M is Measure everywhere; maiN'},
-  {id:'drawExt',   label:'Extension',      scope:'roof', key:'x',
-   note:'E went to Select; eXtension'},
+  {id:'drawMain',  label:'Outline',        scope:'roof', key:'x',
+   note:'X for the outline pen; N is free again'},
   {id:'ridgeDraw', label:'Ridge',          scope:'roof', key:'r'},
   {id:'itChimney', label:'Chimney',        scope:'roof', key:'c'},
   {id:'itDormer',  label:'Dormer',         scope:'roof', key:'d'},
@@ -15258,8 +15315,12 @@ function finishDraw(){
     +' m². Now press Ridge and drag lines across it.';
   draw(); roofReport();
 }
-$('drawMain').onclick=()=>beginDraw('main');
-$('drawExt').onclick=()=>beginDraw('extension');
+/* ONE BUTTON (21v). 'Main' and 'Extension' were the same pen with a
+   different label on what it lands, and the answer is never in doubt: the
+   first outline on an empty map is the main roof, everything after it is an
+   extension. */
+function outlineKind(){ return SHAPES.length?'extension':'main'; }
+$('drawMain').onclick=()=>beginDraw(outlineKind());
 /* Undo history. Each entry is a snapshot plus the closure that puts it back,
    which is simpler and safer than trying to invert each operation — removing a
    ridge also prunes orphaned junctions and renumbers the rest, and rebuilding
@@ -15273,11 +15334,67 @@ function pushRedo(what,restore){
   syncRedo();
 }
 function clearRedo(){ if(REDO.length){ REDO=[]; syncRedo(); } }
+/* ================= A REDO THAT REDOES (21v) ==========================
+   What is called REDO above is the UNDO stack: each entry knows how to put
+   one thing back. Redo needs the opposite -- the drawing as it was BEFORE
+   an undo ran -- and the entries are closures over whatever each edit
+   touched, so there is nothing in them to invert.
+
+   The whole-drawing snapshot already exists and is already trusted: it is
+   what the autosave writes. Undo takes one before it restores; Redo puts it
+   back. Ten deep. */
+let UNDONE=[];
+function snapshotNow(){
+  try{ return JSON.stringify(sessionPayload()); }catch(_){ return null; }
+}
+function applySnapshot(text){
+  if(!text) return false;
+  let j=null;
+  try{ j=JSON.parse(text); }catch(_){ return false; }
+  if(!j||!j.features) return false;
+  const gotAreas=j.features.filter(f=>/Polygon$/.test(f.geometry&&f.geometry.type));
+  const gotLines=j.features.filter(f=>/LineString$/.test(f.geometry&&f.geometry.type));
+  if(gotAreas.length) AREAS=gotAreas;
+  LINES=gotLines;
+  try{ restoreSession(j); }catch(_){ return false; }
+  if(SEL<0||!AREAS[SEL]) SEL=(typeof autoPick==='function')?autoPick():0;
+  syncDock(); syncPlotItems(); syncHeightUI(); showSel();
+  draw();
+  return true;
+}
+/* AN ENTRY IS EITHER A SNAPSHOT OR A CLOSURE. Most edits are in the
+   drawing, and a snapshot puts them back exactly. A PEN MID-DRAWING IS NOT:
+   points not yet formed are not in the session, so a snapshot cannot know
+   about them -- that case hands its own way back instead. */
+function pushUndone(fn){
+  if(typeof fn==='function'){
+    UNDONE.push({fn:fn});
+  }else{
+    const snap=snapshotNow();
+    if(!snap) return;
+    UNDONE.push({snap:snap});
+  }
+  if(UNDONE.length>10) UNDONE.shift();
+  syncRedo();
+}
+function clearUndone(){ if(UNDONE.length){ UNDONE=[]; syncRedo(); } }
+/* BOTH BUTTONS ARE SYNCED HERE. Undo's state used to be set only in
+   syncPlotItems, which meant an edit that pushed onto the stack armed the
+   old Redo button and left Undo asleep until something else redrew the plot
+   panel. One place, both buttons. */
 function syncRedo(){
   const b=$('redoBtn');
-  if(!b) return;
-  b.disabled=!REDO.length;
-  b.title=REDO.length?('Restore: '+REDO[REDO.length-1].what):'Nothing to restore';
+  if(b){
+    const n=(typeof UNDONE!=='undefined')?UNDONE.length:0;
+    b.disabled=!n;
+    b.title=n?'Put back what Undo just took':'Nothing to put back';
+  }
+  const u=$('ptUndo');
+  if(u){
+    u.disabled=!(REDO.length||(DRAW&&DRAW.pts&&DRAW.pts.length));
+    u.title=REDO.length?('Take back: '+REDO[REDO.length-1].what)
+                       :'Take back the last thing done';
+  }
 }
 function snapRoof(R){
   const nodes=R.nodes.map(n=>n.slice());
@@ -15287,19 +15404,40 @@ function snapRoof(R){
                activateRoof(R); ROOF=R; };
 }
 $('redoBtn').onclick=()=>{
-  const e=REDO.pop();
-  if(!e){ syncRedo(); return; }
-  e.restore();
-  RIDGESEL=null; LINEHOVER=null; $('ridgeDel').disabled=true;
-  $('roofHint').textContent='Restored: '+e.what+'.';
-  syncRedo(); draw(); roofReport();
+  const back=UNDONE.pop();
+  if(!back){ syncRedo(); return; }
+  /* PUTTING SOMETHING BACK IS ITSELF AN EDIT (21w). Redo used to restore
+     the drawing and leave the undo stack empty, so there was nothing to
+     take away again. It records its own way back now, like everything
+     else does. */
+  const before=snapshotNow();
+  if(before) pushRedo('what you put back',()=>{ applySnapshot(before); });
+  if(back.fn){
+    back.fn(); draw(); syncPlotItems(); syncRedo();
+    $('roofHint').textContent='Put back.';
+    return;
+  }
+  if(applySnapshot(back.snap)){
+    RIDGESEL=null; LINEHOVER=null;
+    if($('ridgeDel')) $('ridgeDel').disabled=true;
+    $('roofHint').textContent='Put back.';
+    try{ roofReport(); }catch(_){}
+  }
+  syncRedo();
 };
-$('drawUndo').onclick=()=>{
-  if(!DRAW||!DRAW.pts.length) return;
+/* THE OUTLINE'S OWN UNDO IS GONE (21u): one button for the whole drawing,
+   in the Mode column. What it did -- take the last point off the outline
+   being drawn -- ptUndo now does, in the same branch that already took a
+   point off a plot pen. */
+function undoDrawnPoint(){
+  if(!DRAW||!DRAW.pts||!DRAW.pts.length) return false;
+  const kept=DRAW.pts.map(q=>q.slice()), keptKind=DRAW.kind;
+  pushUndone(()=>{ DRAW={kind:keptKind,pts:kept.map(q=>q.slice())}; });
   const pts=DRAW.pts.map(q=>q.slice()), kind=DRAW.kind;
   pushRedo('the point you removed',()=>{ DRAW={kind,pts:pts.map(q=>q.slice())}; });
   DRAW.pts.pop(); draw();
-};
+  return true;
+}
 $('drawClear').onclick=()=>{
   const shapes=SHAPES.slice(), was=ROOF, drawn=DRAW;
   pushRedo('the outlines you cleared',()=>{ SHAPES=shapes.slice(); ROOF=was; DRAW=drawn;
@@ -24576,6 +24714,22 @@ function ghostCalClick(mx,my){
   }
   const mStr=window.prompt('Distance between the two points, in metres:','5');
   const m=parseFloat(mStr);
+  /* THE FAILURES SPEAK (21y). A cancelled prompt, or a distance that is not
+     a number, used to fall through in silence with the button already
+     reading 'Set scale' -- exactly what 'I cannot seem to set the scale'
+     looks like from the outside. */
+  if(mStr===null||String(mStr).trim()===''){
+    $('roofHint').textContent='Set scale cancelled - the distance was not given.';
+    draw(); return true;
+  }
+  if(!(isFinite(m)&&m>0)){
+    $('roofHint').textContent='Set scale: "'+mStr+'" is not a distance in metres. Press Set scale and try again.';
+    draw(); return true;
+  }
+  if(!(px>2)||!isFinite(px)){
+    $('roofHint').textContent='Set scale could not measure between those clicks - press Set scale and click the two ends again.';
+    draw(); return true;
+  }
   if(isFinite(m)&&m>0&&px>2){
     GHOST.ppm=px/m; GHOST.ready=true; GHOST.scaleTrusted=true;
     if(window.RoofGhost&&RoofGhost.FP&&RoofGhost.FP.plan){
@@ -25228,6 +25382,11 @@ function syncPlotItems(){
     const bo=$('brushOpts');
     const run=!!(on&&PLOTMODE&&(PLOTTOOL==='brush'||PLOTTOOL==='line'));
     if(bo) bo.style.display=run?'':'none';
+    /* the panel it lives in follows the same answer */
+    const pop=$('plotPop');
+    if(pop) pop.style.display=run?'':'none';
+    const sl=$('ptBrushSlide');
+    if(sl&&PLOTMODE) sl.value=String(BRUSH_W[PLOTMODE]||0.6);
     const fw=$('ptFollowWrap');
     if(fw) fw.style.display=(on&&PLOTMODE&&PLOTTOOL==='line')?'':'none';
     const bw=$('ptBoxSnapWrap');
@@ -25242,7 +25401,7 @@ function syncPlotItems(){
   if(!on&&ERASEMODE){ ERASEMODE=null; ERASEDRAG=null; }
   if(!on&&LINECUT) LINECUT=null;
   const pen=!!(DRAW&&isPlotPen(DRAW.kind));
-  if(u) u.disabled=!(REDO.length||(pen&&DRAW.pts.length));
+  syncRedo();                       // Undo and Redo are synced in one place
   /* never disabled outright any more: the halves arm an eraser, and an
      eraser armed before the first item is laid is not an error */
   if(c) c.disabled=!AREAS.length;
@@ -25319,6 +25478,15 @@ document.addEventListener('pointerdown',(e)=>{
 },true);
 syncKeyTable();
 syncHotkeyBadges();
+/* the slider and the box are two faces of one number */
+if($('ptBrushSlide')) $('ptBrushSlide').oninput=()=>{
+  const v=parseFloat($('ptBrushSlide').value);
+  if(!isFinite(v)||!PLOTMODE) return;
+  BRUSH_W[PLOTMODE]=Math.round(Math.max(0.2,Math.min(6,v))*10)/10;
+  if($('ptBrushW')) $('ptBrushW').value=BRUSH_W[PLOTMODE].toFixed(1);
+  if(PLOTPAINT) PLOTPAINT.w=BRUSH_W[PLOTMODE];
+  draw();
+};
 $('ptBrushW').onchange=()=>{
   const w=Math.max(0.2,Math.min(6,+$('ptBrushW').value||0.6));
   $('ptBrushW').value=w.toFixed(1);
@@ -25818,9 +25986,15 @@ $('ptUndo').onclick=()=>{
       : 'Click on the boundary to start.');
     syncPlotItems(); draw(); return;
   }
+  /* an OUTLINE being drawn is the same case, and used to have a button of
+     its own in the Outline column (21u) */
+  if(undoDrawnPoint()){ syncPlotItems(); return; }
   const e=REDO.pop();
-  if(e){ e.restore(); syncRedo(); syncPlotItems(); draw(); return; }
-  if(PLOTITEMS.length){ PLOTITEMS.pop(); syncPlotItems(); draw(); }
+  if(e){
+    pushUndone();                 // what the drawing looked like before this
+    e.restore(); syncRedo(); syncPlotItems(); draw(); return;
+  }
+  if(PLOTITEMS.length){ pushUndone(); PLOTITEMS.pop(); syncPlotItems(); draw(); }
 };
 /* CLEAR DROPS WHAT IS ON SCREEN, WHICH INCLUDES A DRAWING IN PROGRESS.
    It only ever emptied PLOTITEMS, and syncPlotItems disabled it whenever that
@@ -26534,6 +26708,7 @@ canvas.addEventListener('wheel',e=>{
     BRUSH_W[PLOTMODE]=Math.round(w*10)/10;
     if(PLOTPAINT) PLOTPAINT.w=BRUSH_W[PLOTMODE];
     if($('ptBrushW')) $('ptBrushW').value=BRUSH_W[PLOTMODE].toFixed(1);
+    if($('ptBrushSlide')) $('ptBrushSlide').value=String(BRUSH_W[PLOTMODE]);
     ptSay('Brush '+BRUSH_W[PLOTMODE].toFixed(1)+' m wide.','Wheel up for wider.');
     draw();
     return;
@@ -26613,6 +26788,16 @@ canvas.addEventListener('pointerdown',e=>{
   if(e.button!==0) return;                       // left button only
   const r=canvas.getBoundingClientRect();
   const ox=e.clientX-r.left, oy=e.clientY-r.top;
+  /* SET SCALE OUTRANKS EVERYTHING, IN ANY MODE (21y). The Ghost plan column
+     is on the bar in plot mode, so that is where George pressed Set scale
+     -- and the two clicks were only accepted in roof mode: in plot mode
+     the press went to the armed plot tool, or panned the map, and the
+     scale never set. A calibration is a modal measurement; while it is
+     armed the next two presses are its, whatever else is on. */
+  if(GHOST&&GHOSTCAL){
+    const [cmx,cmy]=screenToMap(ox,oy);
+    if(ghostCalClick(cmx,cmy)){ draw(); return; }
+  }
   if(!MASKMODE&&ROADNAME){
     /* The label is picked up before plots, roofs and ridges: it is small, it
        sits over a road nobody selects, and a click that lands on it can only
@@ -26698,10 +26883,8 @@ canvas.addEventListener('pointerdown',e=>{
      measurement, not a move -- and George's likeliest path to them is
      place, lock, notice the size, reach for Set scale. Routing them through
      the drag block meant a locked plan silently ate both clicks. */
-  if(MODE==='roof'&&VIEW&&GHOST&&GHOSTCAL){
-    const [cmx,cmy]=screenToMap(ox,oy);
-    if(ghostCalClick(cmx,cmy)){ draw(); return; }
-  }
+  /* (the calibration branch that stood here moved to the top of the handler
+     in 21y, so it is reached in any mode) */
   if(MODE==='roof'&&VIEW&&node==null&&GHOST&&!GHOST.locked
      &&(SELMODE||(!DRAW&&!PLACEMODE&&!RIDGEMODE))){
     /* the Select tool always carries the ghost; with every drawing hand idle
@@ -27058,10 +27241,10 @@ canvas.addEventListener('pointerup',e=>{
        which is a click that slipped rather than a distance anyone wanted. */
     if(L<0.05){ say('Too short — drag to measure a distance.'); draw(); return; }
     RULERS.push(D);
-    pushRedo('the measurement you took',()=>{
-      const at=RULERS.indexOf(D); if(at>=0) RULERS.splice(at,1);
-      syncRuler(); draw();
-    });
+    /* NOT ON THE SHARED STACK (21u). Measurements have their own arrow
+       inside the Measure button; leaving them here meant the general Undo
+       ate a measurement before it reached the thing he actually meant to
+       take back. */
     syncRuler();
     say('Measured '+rulerLabel(L)+'. Measurements are not exported.');
     draw(); return;
@@ -27616,6 +27799,31 @@ window.addEventListener('keydown',e=>{
 
 /* ---------- main ---------- */
 function say(t,err){statusEl.innerHTML=err?'<span class="err">'+t+'</span>':t;}
+/* WHAT THE TOOLS SAY NOW GOES TO THE STATUS LINE (21x). roofHint is still
+   written -- it is read in a dozen places and by the gates -- but it holds
+   no height in the bar, so the words would be lost without this. Watching
+   the element is the one way to catch every writer without hunting them all
+   down; there are more than sixty. */
+let HINT_LAST='';
+function mirrorRoofHint(){
+  const el=(typeof $==='function')?$('roofHint'):null;
+  if(!el) return false;
+  const t=(el.textContent||'').trim();
+  /* the same words twice in a row are not news, and every redraw rewrites
+     the element -- without this the status line flickers through the same
+     sentence over and over */
+  if(!t||t===HINT_LAST) return false;
+  HINT_LAST=t;
+  try{ say(t); }catch(_){}
+  return true;
+}
+(function watchRoofHint(){
+  const el=(typeof $==='function')?$('roofHint'):null;
+  if(!el||typeof MutationObserver!=='function') return;
+  try{ new MutationObserver(mirrorRoofHint)
+        .observe(el,{childList:true,characterData:true,subtree:true}); }
+  catch(_){}
+})();
 $('half').oninput=e=>{HALF=+e.target.value;$('halfval').textContent=HALF+' m';};
 try{ const k=localStorage.getItem('osKey'); if(k){$('key').value=k;$('remember').checked=true;} }catch(_){}
 
