@@ -656,9 +656,31 @@
     </div>
     <div class="rbcol">
       <span class="rblab">Ghost plan</span>
-      <div id="ghostBox">
+      <div id="ghostBox" style="position:relative">
         <div class="row" style="margin:0;gap:4px;align-items:center">
           <button id="ghostLoad" class="ghost" style="margin:0;padding:4.5px 7.2px;font-size:10.8px">Upload plan</button>
+          <button id="ghostOpen" class="ghost" style="margin:0;padding:4.5px 7.2px;font-size:10.8px;display:none"
+                  title="Turn, fade, lock, set the scale, choose a floor">Plan…</button>
+        </div>
+        <div class="row" style="margin:4px 0 0;gap:4px;align-items:center">
+          <button id="exportOpen" class="ghost" style="margin:0;padding:4.5px 7.2px;font-size:10.8px"
+                  title="Roof JSON, Map PNG and the halo">Export…</button>
+        </div>
+        <!-- THE EXPORTS, off the bar (22b) -->
+        <div id="exportPop" style="display:none;position:absolute;z-index:70;top:100%;left:0;
+             margin-top:4px;padding:8px;background:#fdfcf9;border:1px solid #d9d6cc;
+             border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.14);white-space:nowrap">
+          <div class="rbpair" style="grid-template-columns:minmax(74px,1fr)">
+            <button id="roofExport" class="ghost" disabled>Roof JSON</button>
+            <button id="exportPng" class="ghost" disabled>Map PNG</button>
+            <label class="rbchk" id="haloWrap"
+                   title="Map PNG cuts to the highlighted plot AND every roof outline, with six metres of context fading out round them — ten where an edge meets a road or pavement"><input type="checkbox" id="haloOn"> halo</label>
+          </div>
+        </div>
+        <!-- THE PLAN CONTROLS, off the bar (22b) -->
+        <div id="ghostPop" style="display:none;position:absolute;z-index:70;top:100%;left:0;
+             margin-top:4px;padding:8px;background:#fdfcf9;border:1px solid #d9d6cc;
+             border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.14);white-space:nowrap">
           <div id="ghostCtl" style="display:none">
             <div class="row" style="margin:0;gap:4px;align-items:center">
               <label style="margin:0;font-size:11px">Turn</label>
@@ -679,9 +701,9 @@
               <button id="ghostDel" class="ghost" style="margin:0;padding:3.6px 5.4px;font-size:10px">Remove</button>
             </div>
           </div>
+          <div id="ghostFloors" style="margin-top:6px"></div>
         </div>
         <input type="file" id="ghostFile" accept="image/*" style="display:none">
-        <div id="ghostFloors" style="margin-top:2px"></div>
         <div id="ghostStat" style="font-size:11px;color:#8a897f;margin:2px 0 0">No plan loaded.</div>
       </div>
     </div>
@@ -705,17 +727,7 @@
         </div>
       </div>
     </div>
-    <div class="rbcol">
-      <span class="rblab">Export</span>
-      <!-- ONE COLUMN, NOT A PAIR (21w): the block is narrow rather than
-           wide, which is what the bar is short of once it wraps. -->
-      <div class="rbpair" style="grid-template-columns:minmax(74px,1fr)">
-        <button id="roofExport" class="ghost" disabled>Roof JSON</button>
-        <button id="exportPng" class="ghost" disabled>Map PNG</button>
-        <label class="rbchk" id="haloWrap"
-               title="Map PNG cuts to the highlighted plot AND every roof outline, with six metres of context fading out round them — ten where an edge meets a road or pavement"><input type="checkbox" id="haloOn"> halo</label>
-      </div>
-    </div>
+
   </div>
   <div class="rbbody">
       <div class="hint" id="roofHint"></div>
@@ -9752,7 +9764,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-22a';
+const BUILD='build 2026-08-22b';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -15016,6 +15028,10 @@ function ghostHit(mx,my){
   return rx>=0&&ry>=0&&rx<=r.w&&ry<=r.h;
 }
 function ghostSyncPanel(){
+  /* the Plan button is only worth offering once there is a plan */
+  const ob=$('ghostOpen');
+  if(ob) ob.style.display=GHOST?'':'none';
+  if(!GHOST) popShow('ghostPop',false);
   const box=$('ghostBox'); if(!box) return;
   const has=!!GHOST;
   $('ghostCtl').style.display=has?'':'none';
@@ -24643,6 +24659,7 @@ function ghostBegin(img,name){
          opacity:0.45, name:(name||'plan').replace(new RegExp('[.][^.]+$'),''),
          img:c, dataUrl:c.toDataURL('image/jpeg',0.82),
          region:null, ring:[], segs:[], placed:false};
+  popShow('ghostPop',true);            // a freshly loaded plan wants its controls
   RoofGhost.hooks.hint=(t)=>{ $('roofHint').textContent=String(t); };
   RoofGhost.hooks.sync=()=>{ ghostAdopt(); ghostPlaceIfNew(); ghostSyncPanel(); };
   RoofGhost.hooks.apply=()=>{ ghostAdopt(); ghostPlaceIfNew(); draw(); };
@@ -24678,6 +24695,31 @@ $('ghostShow').onclick=function(){
 $('ghostDel').onclick=()=>{ GHOST=null; GHOSTDRAG=null; ghostSyncPanel(); draw(); };
 /* the composer's own fallback, on the map: two clicks on the ghost, a known
    distance typed, and the scale is set from the picture George is looking at */
+/* ============ THE TWO POP-OUTS (22b) ================================
+   Both hang off their own button and close on Escape or a press outside,
+   which is how the Shortcuts one already behaves. Nothing in them changes
+   the bar's height: that is the whole point. */
+function popShow(id,on){
+  const el=$(id);
+  if(!el) return;
+  const want=(on===undefined)?(el.style.display==='none'):!!on;
+  el.style.display=want?'':'none';
+  if(want){                             // one at a time
+    for(const other of ['ghostPop','exportPop','keyPop'])
+      if(other!==id&&$(other)) $(other).style.display='none';
+  }
+}
+if($('ghostOpen')) $('ghostOpen').onclick=()=>popShow('ghostPop');
+if($('exportOpen')) $('exportOpen').onclick=()=>popShow('exportPop');
+document.addEventListener('pointerdown',e=>{
+  for(const id of ['ghostPop','exportPop']){
+    const el=$(id);
+    if(!el||el.style.display==='none') continue;
+    const btn=$(id==='ghostPop'?'ghostOpen':'exportOpen');
+    if(el.contains(e.target)||(btn&&btn.contains(e.target))) continue;
+    el.style.display='none';
+  }
+},true);
 let GHOSTCAL=null;
 $('ghostCal').onclick=function(){
   if(!GHOST) return;
@@ -27718,6 +27760,14 @@ canvas.addEventListener('contextmenu',e=>{      // right-click: undo the last po
 window.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
   if(MASKMODE){ exitMaskMode(); return; }     // before anything else
+  /* A POP-OUT TAKES THE ESCAPE FIRST, in any mode -- it is a panel over the
+     map, and the mode guard below would otherwise leave it open in plot
+     mode with no way to shut it from the keyboard. */
+  if(($('ghostPop')&&$('ghostPop').style.display!=='none')
+     ||($('exportPop')&&$('exportPop').style.display!=='none')){
+    popShow('ghostPop',false); popShow('exportPop',false);
+    return;
+  }
   if(MODE!=='roof') return;
   if(ITEMDRAG){                               // put it back where it was
     const it=ROOF&&ROOF.items[ITEMDRAG.i];
