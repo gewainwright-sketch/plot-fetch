@@ -432,6 +432,13 @@
                 title="Take back the last thing done — a point, an item, a rub, an outline, a cut">Undo</button>
         <button id="redoBtn" class="ghost" disabled>Redo</button>
       </div>
+      <!-- CLEAR AND SNAP CAME HERE FROM THE OUTLINE COLUMN (22d). Clear
+           throws away the drawing and snap governs every pen, so neither
+           belonged among the roof tools. Shown only while the roof is up. -->
+      <div class="rbpair" id="roofModeRow" style="margin-top:4px;display:none">
+        <button id="drawClear" class="ghost">Clear</button>
+        <label class="rbchk"><input type="checkbox" id="snapOn" checked> snap</label>
+      </div>
       <!-- The plot items line reads here, under Measure and Clear, where
            George wanted it: the Mode column is short and the Plot items
            column is tall, so the sentence fills a gap instead of pushing
@@ -454,18 +461,15 @@
       </div>
     </div>
     <div class="rbgroup" id="roofPanel" style="display:none">
-      <div class="rbcol">
-        <span class="rblab">Outline</span>
-        <div class="rbpair">
-          <button id="drawMain" class="ghost"
-                  title="Draw an outline. The first on an empty map is the main roof; every one after it is an extension.">Outline</button>
-          <button id="drawClear" class="ghost">Clear</button>
-        </div>
-        <label class="rbchk"><input type="checkbox" id="snapOn" checked> snap</label>
-      </div>
+      <!-- ONE COLUMN (22d): the outline pen leads, Ridge sits to its right,
+           and Clear and snap have gone to the Mode column -- neither is a
+           roof tool. One column fewer on the mode that was dropping the bar
+           to an unworkable depth on an iPad mini. -->
       <div class="rbcol">
         <span class="rblab">Roof</span>
         <div class="rbpair">
+          <button id="drawMain" class="ghost"
+                  title="Draw an outline. The first on an empty map is the main roof; every one after it is an extension.">Outline</button>
           <button id="ridgeDraw" class="ghost">Ridge</button>
           <button id="deckDraw" class="ghost"
                   title="Drag a rectangle over the roof — four ridge lines land where you drew, a flat deck between them">Deck</button>
@@ -819,7 +823,7 @@
     <div class="legend">
       <div><span class="sw" style="background:var(--bld)"></span>Building</div>
       <div><span class="sw" style="background:var(--land)"></span>Land / yard</div>
-      <div><span class="sw" style="background:var(--landsel)"></span>Approximate plot size</div>
+      <div><span class="sw" style="background:var(--landsel)"></span>Plot</div>
       <div><span class="ln" style="border-color:#5c5c58"></span>Wall / fence / hedge</div>
       <div><span class="ln" style="border-color:#0a7a4e"></span>Division</div>
       <div><span class="ln" style="border-color:#96564a"></span>Building outline</div>
@@ -9764,7 +9768,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-22c';
+const BUILD='build 2026-08-22h';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -12579,14 +12583,15 @@ function renderScene(g,W,H,live,scale,skipFurniture){
      COORD_DOT_R is the drawn radius and the key reads it, so the swatch and
      the drawing cannot drift apart. */
   {
+    /* 22f: ON SCREEN ONLY. The anchor says where the fetch was centred,
+       which is worth seeing while working and means nothing on a plan of a
+       property -- so the sheet no longer carries it, nor names it in the
+       key. */
     const ax=X(PT[0],PT[1]), ay=Y(PT[0],PT[1]);
     if(live){
       g.beginPath();g.arc(ax,ay,8*k,0,7);
       g.strokeStyle='#fff';g.lineWidth=4*k;g.stroke();
       g.strokeStyle=css('--accent')||'#b0421a';g.lineWidth=2.5*k;g.stroke();
-    }else{
-      g.beginPath();g.arc(ax,ay,COORD_DOT_R*k,0,7);
-      g.fillStyle=COORD_DOT_COL;g.fill();
     }
   }
   /* Roof labels: which outline is the Main and which are the extensions,
@@ -13606,8 +13611,9 @@ function exportPng(){
      are trustworthy to. 264 leaves about 13 px at the worst rotation. */
   /* 300, not 264: the notice below is one line of 15px text with a lead
      above it, and the credit keeps its 24px from the bottom edge. */
-  /* room for the notice to run to two lines without crowding the credit */
-  const M=1600, FOOT=324, k=M/620;      // k scales linework up from screen sizing
+  /* 22h: the rows are 24 apart, not 34, and the strip is only as deep as
+     what sits in it -- title, key, notice, credit. */
+  const M=1600, FOOT=252, k=M/620;      // k scales linework up from screen sizing
   const c=document.createElement('canvas');
   c.width=M; c.height=M+FOOT;
   const g=c.getContext('2d');
@@ -13685,38 +13691,44 @@ function exportPng(){
      labelled E/N line below already says. A bare pair is not a title. */
   const rawTitle=$('loc').value.trim();
   const barePair=/^\s*-?\d{4,7}(\.\d+)?\s*,\s*-?\d{4,7}(\.\d+)?\s*$/.test(rawTitle);
-  /* 21y: with no address to title the sheet by, the grid reference IS the
-     title, and the line below carries the plot area alone -- the numbers
-     are printed once, and 'OS MasterMap extract' says nothing. */
-  const gridTitle='E '+PT[0].toFixed(1)+'  ·  N '+PT[1].toFixed(1);
+  /* 22f: THE PLOT AREA TITLES THE SHEET when there is no address. The grid
+     reference has gone from the sheet altogether -- it means nothing to
+     whoever reads a plan of a garden, and it is in the save file for
+     anyone who needs it. */
   const noAddress=barePair||!rawTitle;
-  const title=noAddress?gridTitle:rawTitle;
+  const areaTitle=(SEL>=0)
+    ? ('Selected plot approx. '+selArea().toFixed(1)+' m\u00b2')
+    : 'Plot plan';
+  const title=noAddress?areaTitle:rawTitle;
   g.textAlign='right';
   g.fillStyle='#1c1c1a'; g.font='600 30px system-ui,-apple-system,"Segoe UI",sans-serif';
-  g.fillText(title.length>62?title.slice(0,61)+'…':title,RIGHT,M+50);
+  g.fillText(title.length>62?title.slice(0,61)+'…':title,RIGHT,M+42);
 
   /* 21q: the projection name and the box size went from this line -- neither
      means anything to whoever reads the sheet. The grid reference and the
      plot area stay. (The name is not written here even in a comment: the
      gate that checks it is gone reads this function's source.) */
-  let sub=noAddress?'':('E '+PT[0].toFixed(1)+'  ·  N '+PT[1].toFixed(1));
+  let sub='';
   if(SEL>=0){
     const a=rings(AREAS[SEL].geometry).reduce((s,r)=>s+ringArea(r),0);
     /* the printed figure sums the highlight too, or an export contradicts
        the panel it was made from */
-    /* 21z: APPROXIMATE, and said so. The figure is MasterMap's polygon, not
-       a survey, and the label on the plot itself has said so since 21q. */
-    sub+=(sub?'  ·  ':'')+'selected plot approx. '+selArea().toFixed(1)+' m²'
-      +(selAll().length>1?' ('+selAll().length+' plots)':'');
+    /* the area is the TITLE now when there is no address, so the line below
+       only repeats it when there is one -- and it never says it twice */
+    if(!noAddress)
+      sub+='selected plot approx. '+selArea().toFixed(1)+' m²'
+        +(selAll().length>1?' ('+selAll().length+' plots)':'');
+    else if(selAll().length>1)
+      sub+=selAll().length+' plots';
   }
   g.fillStyle='#6d6c66'; g.font='21px ui-monospace,Menlo,Consolas,monospace';
-  g.fillText(sub,RIGHT,M+84);
+  g.fillText(sub,RIGHT,M+66);
   g.textAlign='left';                  // the rows below place their own x
 
   /* The legend has to name what the PAPER shows, so it takes the green the
      export actually paints, not the yellow that lives on screen. */
   const swatches=[[css('--bld')||'#e2c4ba','Building'],[css('--land')||'#eef0e5','Land / yard'],
-                  [css('--landsel-paper')||'#cfe4b4','Approximate plot size']];
+                  [css('--landsel-paper')||'#cfe4b4','Plot']];
   if(PLOTITEMS.length){
     const kinds={};
     PLOTITEMS.forEach(it=>{kinds[it.type]=true;});
@@ -13731,8 +13743,7 @@ function exportPng(){
      on the margin. */
   const strokes=[['#5c5c58','Wall / fence / hedge','line'],
                  ['#0a7a4e','Division','line'],
-                 ['#96564a','Building outline','line'],
-                 [COORD_DOT_COL,'Coordinate point','dot']];
+                 ['#96564a','Building outline','line']];
   g.font='21px system-ui,-apple-system,"Segoe UI",sans-serif';
   /* width of a row of key entries, without the gap that follows the last */
   const rowWidth=list=>list.reduce((t,e,i)=>
@@ -13744,7 +13755,7 @@ function exportPng(){
     const keyW=Math.max(rowWidth(swatches),rowWidth(strokes));
     fadeBehindBox(g,RIGHT-keyW-10,M+96,keyW+20,74,1,18);
   }
-  let x=RIGHT-rowWidth(swatches), y=M+118;
+  let x=RIGHT-rowWidth(swatches), y=M+90;
   for(const[col,label]of swatches){
     g.fillStyle=col; g.fillRect(x,y-15,26,17);
     g.strokeStyle='#b9b5a8'; g.lineWidth=1; g.strokeRect(x+.5,y-14.5,25,16);
@@ -13757,7 +13768,7 @@ function exportPng(){
      so the key cannot quietly describe a dot the sheet does not draw.
      It rides in the stroke row so the footer keeps its two rows and its
      height; a third row would push the copyright line off the page. */
-  x=RIGHT-rowWidth(strokes); y=M+152;
+  x=RIGHT-rowWidth(strokes); y=M+114;
   for(const[col,label,mark]of strokes){
     if(mark==='dot'){
       g.fillStyle=col;
@@ -13819,11 +13830,17 @@ function exportPng(){
        keeps 15px and breaks inside the same room the key has, stacking
        UPWARD from where the single line sat -- so the credit below keeps
        its place and the gap above it does not change. */
+    /* IT STARTS WHERE THE KEY STARTS (22e). The key's two rows are
+       right-aligned and each is as wide as its own contents, so the key's
+       left edge is the leftmost of them -- the 'Wall / fence / hedge' row in
+       practice. The notice is left-aligned there and wraps to the same right
+       margin, so its block is the key's block: same left, same right. */
+    const keyLeft=Math.min(RIGHT-rowWidth(swatches),RIGHT-rowWidth(strokes));
     g.fillStyle='#96948c';
-    g.textAlign='right';
+    g.textAlign='left';
     const px=15;
     g.font=px+'px system-ui,-apple-system,"Segoe UI",sans-serif';
-    const room=M-PAD-PADL;
+    const room=RIGHT-keyLeft;
     const lines=[];
     let line='';
     for(const word of notice.split(' ')){
@@ -13833,8 +13850,11 @@ function exportPng(){
     }
     if(line) lines.push(line);
     const lead=px+4;
+    /* HUNG OFF THE KEY, NOT THE BOTTOM (22h). Set from the bottom it drifted
+       away from the block it belongs to whenever the strip changed depth;
+       20 px under the last key row keeps it with the key. */
     lines.forEach((t,i)=>{
-      g.fillText(t,RIGHT,M+FOOT-50-(lines.length-1-i)*lead);
+      g.fillText(t,keyLeft,M+134+i*lead);
     });
   }
   g.fillStyle='#96948c'; g.font='18px system-ui,-apple-system,"Segoe UI",sans-serif';
@@ -26100,6 +26120,8 @@ function setMode(m){
      lose a selection */
   if(m!=='plot'&&typeof SELADD!=='undefined'&&SELADD) setSelAdd(false,true);
   if($('selAdd')) $('selAdd').style.display=(m==='plot')?'':'none';
+  /* Clear and snap belong to the roof, and sit in the Mode column */
+  if($('roofModeRow')) $('roofModeRow').style.display=(m==='roof')?'':'none';
   LINEHOVER=null; $('linechip').style.display='none';
   $('roofPanel').style.display=m==='roof'?'flex':'none';
   syncItems(); syncRoofPick(); syncPlotItems(); syncRoofItemList();
