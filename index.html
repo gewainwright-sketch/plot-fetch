@@ -9764,7 +9764,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-22b';
+const BUILD='build 2026-08-22c';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -9902,21 +9902,14 @@ function drawAreaLabels(g,X,Y,k,live){
        all the panel was ever marking. A thin light halo is laid under the
        text instead, so it stays readable over decking or tarmac without
        drawing a frame round itself. */
-    /* THE HALO IS PROPORTIONAL AND QUIET (21s). A flat 3px stroke under a
-       small label reads as a white block, which is the white George saw. A
-       fifth of the letter height at half strength lifts the words off
-       decking without showing itself. */
-    g.lineJoin='round';
-    g.strokeStyle='rgba(253,252,249,0.5)';
+    /* PLAIN BLACK, NO HALO (22c). The paper backing was there to keep the
+       label readable over decking; George would rather have plain text, and
+       it is his drawing. Both lines in the same ink, so the caption reads as
+       part of the label rather than a note about it. */
     g.font=capPx+'px system-ui,-apple-system,"Segoe UI",sans-serif';
-    g.lineWidth=Math.max(1,capPx*0.2);
-    g.strokeText(cap,px,capY);
-    g.fillStyle='#6b6860';
+    g.fillStyle='#1c1c1a';
     g.fillText(cap,px,capY);
     g.font='600 '+bigPx+'px ui-monospace,Menlo,monospace';
-    g.lineWidth=Math.max(1,bigPx*0.2);
-    g.strokeText(big,px,bigY);
-    g.fillStyle='#1c1c1a';
     g.fillText(big,px,bigY);
     if(live) AREAHITS.push({i:i,x:x0,y:y0,w:w,h:h});
   }
@@ -13613,7 +13606,8 @@ function exportPng(){
      are trustworthy to. 264 leaves about 13 px at the worst rotation. */
   /* 300, not 264: the notice below is one line of 15px text with a lead
      above it, and the credit keeps its 24px from the bottom edge. */
-  const M=1600, FOOT=300, k=M/620;      // k scales linework up from screen sizing
+  /* room for the notice to run to two lines without crowding the credit */
+  const M=1600, FOOT=324, k=M/620;      // k scales linework up from screen sizing
   const c=document.createElement('canvas');
   c.width=M; c.height=M+FOOT;
   const g=c.getContext('2d');
@@ -13820,18 +13814,28 @@ function exportPng(){
       +'approximate, derived from OS MasterMap and site sketching, and define no legal '
       +'boundary or title. Not to be relied on for conveyancing, planning or construction. '
       +'OS data \u00a9 Crown copyright and database right.';
+    /* WRAPPED, NOT SHRUNK (22c). Squeezing it to one line left it smaller
+       than everything round it and running the whole width of the page. It
+       keeps 15px and breaks inside the same room the key has, stacking
+       UPWARD from where the single line sat -- so the credit below keeps
+       its place and the gap above it does not change. */
     g.fillStyle='#96948c';
     g.textAlign='right';
-    let px=15;
+    const px=15;
     g.font=px+'px system-ui,-apple-system,"Segoe UI",sans-serif';
     const room=M-PAD-PADL;
-    let w=g.measureText(notice).width;
-    while(w>room&&px>10){
-      px-=0.5;
-      g.font=px+'px system-ui,-apple-system,"Segoe UI",sans-serif';
-      w=g.measureText(notice).width;
+    const lines=[];
+    let line='';
+    for(const word of notice.split(' ')){
+      const test=line?(line+' '+word):word;
+      if(line&&g.measureText(test).width>room){ lines.push(line); line=word; }
+      else line=test;
     }
-    g.fillText(notice,RIGHT,M+FOOT-50);
+    if(line) lines.push(line);
+    const lead=px+4;
+    lines.forEach((t,i)=>{
+      g.fillText(t,RIGHT,M+FOOT-50-(lines.length-1-i)*lead);
+    });
   }
   g.fillStyle='#96948c'; g.font='18px system-ui,-apple-system,"Segoe UI",sans-serif';
   g.textAlign='right';
