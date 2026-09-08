@@ -386,10 +386,18 @@
     <span style="font-size:10.5px;color:#8a897f">x</span>
     <input type="number" id="soRows" min="1" max="12" step="1" style="margin:0;width:44px"
            title="Panels up the slope">
-    <select id="soOrient" style="margin:0;flex:1" title="Which way up the panels sit">
+    <select id="soOrient" style="margin:0;flex:1" title="Turn the whole array ninety degrees">
       <option value="portrait">Portrait</option>
       <option value="landscape">Landscape</option>
     </select>
+  </div>
+  <div class="row" id="solarSize" style="display:none;margin:4px 0 0;gap:4px;align-items:center">
+    <label style="margin:0;font-size:10.5px;color:#8a897f;white-space:nowrap">Panel size</label>
+    <input type="range" id="soScale" min="0.5" max="2" step="0.05" value="1" style="margin:0;flex:1"
+           title="Bigger or smaller panels — the whole array scales together">
+    <span id="soScaleVal" style="font:10.5px ui-monospace,Menlo,monospace;min-width:34px;text-align:right">100%</span>
+    <button id="soFlip" type="button" class="ghost" style="margin:0;padding:3px 7px;font-size:11px"
+            title="Turn the whole array ninety degrees">↻ 90°</button>
   </div>
   <div id="itemEditNone" style="display:none;color:#8a897f">
     Nothing to set here on the map. Edit opens the full set.
@@ -594,7 +602,10 @@
         <input type="checkbox" id="ptBoxSnap" checked> snap to laid items</label>
       <label class="rbchk" id="ptDeckTurnWrap" style="display:none;margin:6px 0 0;font-size:11px"
              title="Run the boards the other way. Turns the decking already drawn as well as anything drawn next.">
-        <input type="checkbox" id="ptDeckTurn"> boards across</label>
+        <input type="checkbox" id="ptDeckTurn" style="display:none">
+        <button id="ptDeckTurnBtn" type="button" class="ghost"
+                style="margin:0;padding:3px 8px;font-size:11px"
+                title="Turn the boards ninety degrees on every deck laid">↻ turn boards</button></label>
       <div id="balcList" style="display:none;margin:6px 0 0"></div>
       <div class="row" id="parapetOpts" style="display:none;margin:6px 0 0;gap:4px">
         <label style="margin:0;font-size:11px;white-space:nowrap">Parapet</label>
@@ -2341,11 +2352,15 @@ const MODULES = {
 
 function drawSolarArray(ctx, o){
   const M = MODULES[o.module] || MODULES.m405;
+  /* THE ARRAY SCALES AS A WHOLE (22i). One panel or twenty, the same
+     proportion: the module's own dimensions carry the factor, so the gaps
+     between modules keep their place in the block. */
+  const sc = (o.scale == null || !isFinite(o.scale)) ? 1 : Math.max(0.5, Math.min(2, o.scale));
   /* portrait = long edge running up the slope */
-  const mw = o.orientation === 'portrait' ? M.h : M.w;
-  const mh = o.orientation === 'portrait' ? M.w : M.h;
+  const mw = (o.orientation === 'portrait' ? M.h : M.w) * sc;
+  const mh = (o.orientation === 'portrait' ? M.w : M.h) * sc;
   const cells = o.orientation === 'portrait' ? [M.cells[0], M.cells[1]] : [M.cells[1], M.cells[0]];
-  const gap = 0.022;                                   /* module clamp gap */
+  const gap = 0.022 * sc;                              /* module clamp gap */
   const W = o.cols * mw + (o.cols - 1) * gap;
   const H = o.rows * mh + (o.rows - 1) * gap;
   const standoff = 0.11;                               /* rail height      */
@@ -2354,8 +2369,16 @@ function drawSolarArray(ctx, o){
   const s = shadowOffset(standoff, o.sun);
   ctx.save();
   ctx.translate(o.x + s.dx, o.y + s.dy);
-  ctx.rotate((o.rot || 0) * D2R);
+  /* THE SQUASH IS THE ROOF'S, NOT THE PANEL'S (22m). Rotating the item and
+     then scaling by cos(pitch) squashed it along its OWN y -- so an array
+     turned from the fall line was foreshortened along the ridge, and got
+     narrower as the roof got steeper. The slope frame is set first, the
+     squash applied there, and the item turned inside it. With no slope
+     given the two rotations cancel and this draws exactly as it did. */
+  const slope = (o.slope == null || !isFinite(o.slope)) ? (o.rot || 0) : o.slope;
+  ctx.rotate(slope * D2R);
   ctx.scale(1, Math.cos(o.pitch * D2R));
+  ctx.rotate(((o.rot || 0) - slope) * D2R);
   ctx.fillStyle = INK.shadow;
   ctx.fillRect(-W/2, -H/2, W, H);
   ctx.restore();
@@ -5715,10 +5738,16 @@ function symbolBox(type, it, pitchDeg){
   switch (type){
     case 'solar': {
       const M2 = MODULES[o.module] || MODULES.m405;
-      const mw = o.orientation === 'portrait' ? M2.h : M2.w;
-      const mh = o.orientation === 'portrait' ? M2.w : M2.h;
-      return { w:o.cols * mw + (o.cols - 1) * 0.022,
-               h:(o.rows * mh + (o.rows - 1) * 0.022) * c, cy:0 };
+      /* THE SAME SCALE THE DRAWING USES (22k). This is what the hit test, the
+         placement preview and Square items measure with; without it a scaled
+         array was handled at its unscaled size -- scale a panel up and you
+         could still only grab the middle of it. */
+      const sc = (o.scale == null || !isFinite(o.scale)) ? 1 : Math.max(0.5, Math.min(2, o.scale));
+      const mw = (o.orientation === 'portrait' ? M2.h : M2.w) * sc;
+      const mh = (o.orientation === 'portrait' ? M2.w : M2.h) * sc;
+      const gap = 0.022 * sc;
+      return { w:o.cols * mw + (o.cols - 1) * gap,
+               h:(o.rows * mh + (o.rows - 1) * gap) * c, cy:0 };
     }
     case 'velux': {
       const V = veluxSash(o);
@@ -9768,7 +9797,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-22h';
+const BUILD='build 2026-08-22o';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -9821,6 +9850,16 @@ function featureArea(f){
    travels with the session -- keyed by TOID where there is one, so it stays
    with the plot rather than with a position in the list. */
 let AREALAB={}, AREADRAG=null, AREAHITS=[];
+/* the round arrows on laid decking, from the last live render (22n) */
+let DECKHITS=[];
+function deckTurnHit(ox,oy){
+  if(!VIEW||!DECKHITS.length) return null;
+  const [fx,fy]=pxScale();
+  const x=ox*fx, y=oy*fy;
+  for(const b of DECKHITS)
+    if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h) return b.it;
+  return null;
+}
 function areaLabKey(i){
   const f=AREAS[i];
   return (f&&f.properties&&f.properties.TOID)?('t:'+f.properties.TOID):('i:'+i);
@@ -10865,6 +10904,76 @@ function rectDims(a,b){
   return {w:Math.hypot(r[1][0]-r[0][0],r[1][1]-r[0][1]),
           h:Math.hypot(r[3][0]-r[0][0],r[3][1]-r[0][1])};
 }
+/* THE PART THAT WILL LAND (22m). A box dragged from outside the plot line is
+   clipped to the plot on commit, so its whole size is not what George is
+   about to get. Each side is measured along the box's own centre line and
+   trimmed to the run of it that lies inside the highlighted plot. */
+/* how much of a polyline lies inside the highlighted plot (22n) */
+function pathLenInPlot(line){
+  const rings=(typeof plotClipRings==='function')?plotClipRings():[];
+  if(!rings||!rings.length||!line||line.length<2) return pathLen(line||[]);
+  const inside=q=>rings.some(rg=>pip(q,
+    (Math.hypot(rg[0][0]-rg[rg.length-1][0],rg[0][1]-rg[rg.length-1][1])<1e-9)?rg:rg.concat([rg[0]])));
+  let tot=0;
+  for(let i=0;i<line.length-1;i++){
+    const p0=line[i], p1=line[i+1];
+    const L=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]);
+    if(L<1e-9) continue;
+    const N=Math.max(10,Math.ceil(L/0.05));
+    let n=0;
+    for(let j=0;j<N;j++){
+      const q=[p0[0]+(p1[0]-p0[0])*(j+0.5)/N, p0[1]+(p1[1]-p0[1])*(j+0.5)/N];
+      if(inside(q)) n++;
+    }
+    tot+=L*n/N;
+  }
+  return tot;
+}
+function rectDimsInPlot(a,b){
+  const full=rectDims(a,b);
+  const rings=(typeof plotClipRings==='function')?plotClipRings():[];
+  if(!rings||!rings.length) return full;
+  const r=rectRing(a,b);
+  const inside=q=>rings.some(rg=>pip(q,rg[rg.length-1]&&rg[0]&&
+    Math.hypot(rg[0][0]-rg[rg.length-1][0],rg[0][1]-rg[rg.length-1][1])<1e-9?rg:rg.concat([rg[0]])));
+  const span=(p0,p1)=>{
+    const L=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]);
+    if(L<1e-9) return {len:0,a:null,b:null};
+    const N=Math.max(20,Math.ceil(L/0.05));
+    let lo=-1, hi=-1;
+    for(let i=0;i<=N;i++){
+      const q=[p0[0]+(p1[0]-p0[0])*i/N, p0[1]+(p1[1]-p0[1])*i/N];
+      if(inside(q)){ if(lo<0) lo=i; hi=i; }
+    }
+    if(lo<0) return {len:0,a:null,b:null};
+    const at=i=>[p0[0]+(p1[0]-p0[0])*i/N, p0[1]+(p1[1]-p0[1])*i/N];
+    return {len:L*(hi-lo)/N, a:at(lo), b:at(hi)};
+  };
+  /* centre lines: across the middle of the box, and up it */
+  const mu0=[(r[0][0]+r[3][0])/2,(r[0][1]+r[3][1])/2], mu1=[(r[1][0]+r[2][0])/2,(r[1][1]+r[2][1])/2];
+  const mv0=[(r[0][0]+r[1][0])/2,(r[0][1]+r[1][1])/2], mv1=[(r[3][0]+r[2][0])/2,(r[3][1]+r[2][1])/2];
+  const su=span(mu0,mu1), sv=span(mv0,mv1);
+  const w=su.len, h=sv.len;
+  /* the labels sit on the EDGES of the inside part, not on its centre
+     lines: shift each centre-line span out to the box's own edge */
+  const half=(p,q,d)=>[p[0]+(q[0]-p[0])*d, p[1]+(q[1]-p[1])*d];
+  const off=(sp,e0,e1)=>{
+    if(!sp.a) return [null,null];
+    const t=(pt,x0,x1)=>{ const L=Math.hypot(x1[0]-x0[0],x1[1]-x0[1])||1;
+      return ((pt[0]-x0[0])*(x1[0]-x0[0])+(pt[1]-x0[1])*(x1[1]-x0[1]))/(L*L); };
+    return [half(e0,e1,t(sp.a,mu0,mu1)), half(e0,e1,t(sp.b,mu0,mu1))];
+  };
+  const [wp0,wp1]=off(su,r[0],r[1]);
+  const offv=(sp)=>{
+    if(!sp.a) return [null,null];
+    const L=Math.hypot(mv1[0]-mv0[0],mv1[1]-mv0[1])||1;
+    const t=pt=>((pt[0]-mv0[0])*(mv1[0]-mv0[0])+(pt[1]-mv0[1])*(mv1[1]-mv0[1]))/(L*L);
+    return [half(r[0],r[3],t(sp.a)), half(r[0],r[3],t(sp.b))];
+  };
+  const [hp0,hp1]=offv(sv);
+  return {w:w, h:h, clipped:(w<full.w-1e-6||h<full.h-1e-6),
+          wp0:wp0, wp1:wp1, hp0:hp0, hp1:hp1};
+}
 function rectRing(a,b){
   const ca=Math.cos(ROT), sa=Math.sin(ROT);
   const ux=[ca,-sa], uy=[-sa,-ca];
@@ -11422,11 +11531,17 @@ function paintPlotItems(g,X,Y,k,live){
        clipped to it, so a run painted with the brush is boarded to its own
        outline rather than to a bounding box. */
     if(t==='deck'){
-      /* PER ITEM, because two decks may run their boards differently: each
-         is clipped to its own rings and grained its own way. */
-      for(const it of PLOTITEMS){
-        if(!it||it.type!=='deck') continue;
-        const rs=it.rings||(it.ring?[it.ring]:[]);
+      /* ONE PASS PER DIRECTION (22n). Grained per item, two decks that
+         overlapped had their board lines drawn twice on the same shared grid
+         where they met -- the thicker lines George photographed. All the
+         decks running one way are clipped as ONE region and grained once;
+         the turned ones the same. */
+      for(const turn of [false,true]){
+        const rs=[];
+        for(const it of PLOTITEMS){
+          if(!it||it.type!=='deck'||deckTurned(it)!==turn) continue;
+          (it.rings||(it.ring?[it.ring]:[])).forEach(r=>rs.push(r));
+        }
         if(!rs.length) continue;
         g.save();
         g.beginPath();
@@ -11436,9 +11551,31 @@ function paintPlotItems(g,X,Y,k,live){
                             :g.moveTo(X(q[0],q[1]),Y(q[0],q[1])));
           g.closePath();
         });
-        g.clip();
-        drawDeckGrain(g,rs,X,Y,k,deckTurned(it));
+        g.clip('nonzero');
+        drawDeckGrain(g,rs,X,Y,k,turn);
         g.restore();
+      }
+      /* THE TURN IS ON THE DECK (22n): a round arrow in the middle of each
+         area on screen; pressing it turns THAT area's boards. */
+      if(live){
+        DECKHITS.length=0;
+        for(const it of PLOTITEMS){
+          if(!it||it.type!=='deck') continue;
+          const rs=it.rings||(it.ring?[it.ring]:[]);
+          let big=null, ba=0;
+          for(const r of rs){ const a=Math.abs(ringArea([...r,r[0]])); if(a>ba){ ba=a; big=r; } }
+          if(!big||ba<0.5) continue;
+          const c=centroidOf(big);
+          const cx=X(c[0],c[1]), cy=Y(c[0],c[1]), R=9*k;
+          g.beginPath(); g.arc(cx,cy,R,0,7);
+          g.fillStyle='rgba(253,252,249,0.9)'; g.fill();
+          g.strokeStyle='rgba(40,42,40,0.6)'; g.lineWidth=1*k; g.stroke();
+          g.fillStyle='#1c1c1a';
+          g.font=(11*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+          g.textAlign='center'; g.textBaseline='middle';
+          g.fillText('\u21bb',cx,cy+0.5*k);
+          DECKHITS.push({it:it,x:cx-R,y:cy-R,w:2*R,h:2*R});
+        }
       }
     }
     /* THE PATIO IS ITS COLOUR AND NOTHING ELSE. It was slabbed on George's
@@ -11545,6 +11682,32 @@ function paintPlotItems(g,X,Y,k,live){
       g.stroke(); g.setLineDash([]);
     }
   }
+  /* LAID RECTANGLES KEEP THEIR DIMENSIONS ON SCREEN (22m): working chrome,
+     the live pass only, so the plan is annotated while it is being made and
+     the sheet stays clean. */
+  if(live&&PLOTITEMS.length){
+    for(const it of PLOTITEMS){
+      if(!it||!it.ring||it.ring.length!==4) continue;
+      const r=it.ring;
+      const w=Math.hypot(r[1][0]-r[0][0],r[1][1]-r[0][1]);
+      const h=Math.hypot(r[3][0]-r[0][0],r[3][1]-r[0][1]);
+      if(w<0.3||h<0.3) continue;
+      const lab=(q1,q2,txt)=>{
+        const lx=(X(q1[0],q1[1])+X(q2[0],q2[1]))/2;
+        const ly=(Y(q1[0],q1[1])+Y(q2[0],q2[1]))/2;
+        g.font=(10*k)+'px ui-monospace,Menlo,monospace';
+        g.textAlign='center'; g.textBaseline='middle';
+        const mt=g.measureText(txt);
+        const w2=((mt&&isFinite(mt.width))?mt.width:txt.length*6*k)+6*k;
+        g.fillStyle='rgba(253,252,249,0.85)';
+        g.fillRect(lx-w2/2,ly-6*k,w2,12*k);
+        g.fillStyle='rgba(24,64,44,0.9)';
+        g.fillText(txt,lx,ly);
+      };
+      lab(r[0],r[1],w.toFixed(2)+' m');
+      lab(r[0],r[3],h.toFixed(2)+' m');
+    }
+  }
   if(live&&PLOTPLACE){                            // the box being dragged out
     const r=rectRing(PLOTPLACE.a,PLOTPLACE.b);
     g.beginPath();
@@ -11555,7 +11718,8 @@ function paintPlotItems(g,X,Y,k,live){
     g.setLineDash([]);
     /* THE BOX'S OWN TAPE: its two sides as it is sized, the same figures
        the commit will report, each on the edge it measures */
-    const dm=rectDims(PLOTPLACE.a,PLOTPLACE.b);
+    /* what will actually land: the box is clipped to the plot on commit */
+    const dm=rectDimsInPlot(PLOTPLACE.a,PLOTPLACE.b);
     const label=(q1,q2,txt)=>{
       const lx=(X(q1[0],q1[1])+X(q2[0],q2[1]))/2;
       const ly=(Y(q1[0],q1[1])+Y(q2[0],q2[1]))/2;
@@ -11568,8 +11732,9 @@ function paintPlotItems(g,X,Y,k,live){
       g.fillStyle='rgba(24,64,44,0.98)';
       g.fillText(txt,lx,ly);
     };
-    if(dm.w>0.05) label(r[0],r[1],dm.w.toFixed(2)+' m');
-    if(dm.h>0.05) label(r[0],r[3],dm.h.toFixed(2)+' m');
+    /* the size labels moved OUT of this clipped painter to drawPlaceDims
+       (22n): drawn here they were cut away with the part of the box outside
+       the plot, which is exactly when George needs them */
     /* and the along-line tape at the corner in hand, for a box being sized
        along a wall */
     const tape2=alongToAngles(PLOTPLACE.b);
@@ -12276,7 +12441,10 @@ function renderScene(g,W,H,live,scale,skipFurniture){
             drawn=true;
           }else if(window.RoofKit){
             RoofKit.drawSymbol(g,it.type,Object.assign({},it,{x:0,y:0,
-              pitch, sun:sunAngles(R)}));
+              pitch, sun:sunAngles(R),
+              /* the fall line under the item, so the foreshortening is the
+                 roof's whatever way the item has been turned (22m) */
+              slope:(it.type==='solar')?alignRotAt(R,'solar',it.x,it.y):undefined}));
             drawn=true;
           }
         }catch(err){ drawn=false; /* headless: fall through to the box */ }
@@ -12491,7 +12659,9 @@ function renderScene(g,W,H,live,scale,skipFurniture){
         g.arc(X(q[0],q[1]),Y(q[0],q[1]),3.5*k,0,7);
         g.fillStyle='#b0421a'; g.fill(); });
       /* THE TAPE, part one: how long the piece in hand would be */
-      const len=pend.len;
+      /* the INSIDE length (22n): a run begun on the road is clipped to the
+         plot when it lands, so the number is the part that will */
+      const len=pathLenInPlot(line);
       const to=line[line.length-1];
       if(len!=null&&len>0.05){
         const mQ=line[Math.floor(line.length/2)];
@@ -12672,6 +12842,8 @@ function renderScene(g,W,H,live,scale,skipFurniture){
   if(live) try{ drawHaloPreview(g,W,H,view); }catch(_){}
   /* the area labels are ANNOTATION: both passes, so the sheet carries them */
   try{ drawAreaLabels(g,X,Y,k||1,!!live); }catch(_){}
+  if(live) try{ drawLinkLengths(g,X,Y,k||1); }catch(_){}
+  if(live) try{ drawPlaceDims(g,X,Y,k||1); }catch(_){}
   if(live) try{ drawRidgeMeasure(g,X,Y,k||1); }catch(_){}
   /* the item's own dimensions, on the same terms: working chrome, screen
      only, never on the sheet */
@@ -13420,7 +13592,9 @@ function exportPaper(masked){
    an ordinary edge and at HALO_ROAD on the highway one -- a proportional
    ramp, not a step. */
 const HALO_REACH=6;              // metres of fade round an ordinary edge
-const HALO_ROAD=10;              // and where the plot meets road or pavement
+/* 22l: a fifth further into the road, as asked -- a frontage wants the
+   pavement and the near kerb on the sheet, not just the verge. */
+const HALO_ROAD=14;              // and where the plot meets road or pavement (22m: another fifth)
 const HALO_BANDS=14;             // nested unions; the brush uses twelve
 const HALO_POWER=1.7;            // the curve: >1 keeps the near ground solid
 let HALO=false;                  // the export in hand, not a stored setting
@@ -13924,8 +14098,22 @@ $('exportPng').onclick=()=>{
 /* THE PREVIEW IS THE POINT OF THE TICK BOX. George asked to see what the
    sheet will look like before he takes it, so the screen shows the same cut:
    the veil below is the export's own halo, inverted. */
+if($('ptDeckTurnBtn')) $('ptDeckTurnBtn').onclick=(e)=>{
+  if(e&&e.preventDefault) e.preventDefault();
+  const t=$('ptDeckTurn'); if(!t) return;
+  t.checked=!t.checked;
+  t.onchange();
+};
 if($('ptDeckTurn')) $('ptDeckTurn').onchange=()=>{
   const on=$('ptDeckTurn').checked;
+  /* ON THE STACK LIKE EVERY OTHER EDIT (22l): turning the boards changes
+     what is drawn, so Undo must be able to turn them back. */
+  const was=PLOTITEMS.filter(it=>it&&it.type==='deck')
+    .map(it=>({it:it,turn:it.turn}));
+  if(was.length) pushRedo('the boards you turned',()=>{
+    was.forEach(w=>{ w.it.turn=w.turn; });
+    if($('ptDeckTurn')) $('ptDeckTurn').checked=!on;
+  });
   const n=turnAllDecking(on);
   ptSay(n?('Boards turned on '+n+' decking area'+(n===1?'':'s')+'.')
          :'Boards will run '+(on?'across':'along')+' from here.',
@@ -18073,6 +18261,55 @@ function ridgeHoverAt(p){
   return RIDGEMEAS;
 }
 /* the two dimensions, drawn along the wall itself */
+/* EVERY ROOF LINE CARRIES ITS LENGTH (22n): ridge, hip, valley -- and so the
+   roof deck's four lines too. Working chrome, live pass only. */
+function drawLinkLengths(g,X,Y,k){
+  if(MODE!=='roof'||!ROOF||!ROOF.links||!ROOF.links.length||!ROOF.nodes) return;
+  /* ONLY WHILE A RIDGE IS BEING DRAWN (22o): that is when a length is being
+     decided. On all the time they were clutter over every roof. */
+  if(!RIDGEMODE&&!(typeof RD!=='undefined'&&RD)) return;
+  g.save();
+  g.font=(10*k)+'px ui-monospace,Menlo,monospace';
+  g.textAlign='center'; g.textBaseline='middle';
+  for(const L of ROOF.links){
+    const a=ROOF.nodes[L.a], b=ROOF.nodes[L.b];
+    if(!a||!b) continue;
+    const len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    if(len<0.3) continue;
+    const mx=(X(a[0],a[1])+X(b[0],b[1]))/2, my=(Y(a[0],a[1])+Y(b[0],b[1]))/2;
+    const txt=len.toFixed(2)+' m';
+    const mt=g.measureText(txt);
+    const w2=((mt&&isFinite(mt.width))?mt.width:txt.length*6*k)+6*k;
+    g.fillStyle='rgba(253,252,249,0.85)';
+    g.fillRect(mx-w2/2,my-6*k,w2,12*k);
+    g.fillStyle='rgba(24,64,44,0.9)';
+    g.fillText(txt,mx,my);
+  }
+  g.restore();
+}
+/* THE BOX'S DIMENSIONS, DRAWN OUTSIDE THE PLOT CLIP (22n), at the middle of
+   the run that lies inside the plot -- so a box started on the road still
+   shows what will land, where it will land. */
+function drawPlaceDims(g,X,Y,k){
+  if(!PLOTPLACE||MODE!=='plot') return;
+  const dm=rectDimsInPlot(PLOTPLACE.a,PLOTPLACE.b);
+  const lab=(p0,p1,txt)=>{
+    if(!p0||!p1) return;
+    const lx=(X(p0[0],p0[1])+X(p1[0],p1[1]))/2, ly=(Y(p0[0],p0[1])+Y(p1[0],p1[1]))/2;
+    g.font=(11*k)+'px ui-monospace,Menlo,monospace';
+    g.textAlign='center'; g.textBaseline='middle';
+    const mt=g.measureText(txt);
+    const w2=((mt&&isFinite(mt.width))?mt.width:txt.length*6*k)+6*k;
+    g.fillStyle='rgba(253,252,249,0.92)';
+    g.fillRect(lx-w2/2,ly-7*k,w2,14*k);
+    g.fillStyle='rgba(24,64,44,0.98)';
+    g.fillText(txt,lx,ly);
+  };
+  g.save();
+  if(dm.w>0.05) lab(dm.wp0,dm.wp1,dm.w.toFixed(2)+' m');
+  if(dm.h>0.05) lab(dm.hp0,dm.hp1,dm.h.toFixed(2)+' m');
+  g.restore();
+}
 function drawRidgeMeasure(g,X,Y,k){
   const M=RIDGEMEAS;
   if(!M) return;
@@ -20000,11 +20237,15 @@ const MODULES = {
 
 function drawSolarArray(ctx, o){
   const M = MODULES[o.module] || MODULES.m405;
+  /* THE ARRAY SCALES AS A WHOLE (22i). One panel or twenty, the same
+     proportion: the module's own dimensions carry the factor, so the gaps
+     between modules keep their place in the block. */
+  const sc = (o.scale == null || !isFinite(o.scale)) ? 1 : Math.max(0.5, Math.min(2, o.scale));
   /* portrait = long edge running up the slope */
-  const mw = o.orientation === 'portrait' ? M.h : M.w;
-  const mh = o.orientation === 'portrait' ? M.w : M.h;
+  const mw = (o.orientation === 'portrait' ? M.h : M.w) * sc;
+  const mh = (o.orientation === 'portrait' ? M.w : M.h) * sc;
   const cells = o.orientation === 'portrait' ? [M.cells[0], M.cells[1]] : [M.cells[1], M.cells[0]];
-  const gap = 0.022;                                   /* module clamp gap */
+  const gap = 0.022 * sc;                              /* module clamp gap */
   const W = o.cols * mw + (o.cols - 1) * gap;
   const H = o.rows * mh + (o.rows - 1) * gap;
   const standoff = 0.11;                               /* rail height      */
@@ -20013,8 +20254,16 @@ function drawSolarArray(ctx, o){
   const s = shadowOffset(standoff, o.sun);
   ctx.save();
   ctx.translate(o.x + s.dx, o.y + s.dy);
-  ctx.rotate((o.rot || 0) * D2R);
+  /* THE SQUASH IS THE ROOF'S, NOT THE PANEL'S (22m). Rotating the item and
+     then scaling by cos(pitch) squashed it along its OWN y -- so an array
+     turned from the fall line was foreshortened along the ridge, and got
+     narrower as the roof got steeper. The slope frame is set first, the
+     squash applied there, and the item turned inside it. With no slope
+     given the two rotations cancel and this draws exactly as it did. */
+  const slope = (o.slope == null || !isFinite(o.slope)) ? (o.rot || 0) : o.slope;
+  ctx.rotate(slope * D2R);
   ctx.scale(1, Math.cos(o.pitch * D2R));
+  ctx.rotate(((o.rot || 0) - slope) * D2R);
   ctx.fillStyle = INK.shadow;
   ctx.fillRect(-W/2, -H/2, W, H);
   ctx.restore();
@@ -22582,7 +22831,11 @@ function drawItem(c, it){
   const common = { x:it.x, y:it.y, rot:it.rot, pitch:pitchDeg(), sun:MODEL.sun };
   switch (it.type){
     case 'solar':  return drawSolarArray(c, Object.assign({}, common, {
-      module:it.module, cols:it.cols, rows:it.rows, orientation:it.orientation }));
+      /* scale as well (22k): the editor built this object field by field and
+         dropped it, so the same array was one size on the map and another in
+         the preview */
+      module:it.module, cols:it.cols, rows:it.rows, orientation:it.orientation,
+      scale:it.scale }));
     case 'stack':  return drawChimney(c, Object.assign({}, common, {
       pots:it.pots, potType:it.potType, height:it.height }));
     case 'velux':  return drawRoofWindow(c, Object.assign({}, common, {
@@ -23256,7 +23509,18 @@ function segBtn(id, attr, apply){
     apply(b.dataset[attr]); draw();
   });
 }
-segBtn('orientSeg', 'o', v => target('solar').orientation = v);
+/* PORTRAIT / LANDSCAPE FLIPS THE ARRAY (22i). Turning the module alone left
+   the block the same shape with differently-shaped panels in it; George
+   wants the block turned. So the counts swap with the orientation, and a
+   4x2 landscape becomes a 2x4 portrait -- same panels, same area, turned. */
+segBtn('orientSeg', 'o', function(v){
+  const t = target('solar');
+  if (t.orientation !== v){
+    const c = t.cols; t.cols = t.rows; t.rows = c;
+  }
+  t.orientation = v;
+  syncAll();
+});
 segBtn('potSeg', 'p', v => target('stack').potType = v);
 segBtn('domeSeg', 'k', v => target('rooflight').domed = v === 'dome');
 segBtn('vFrameSeg', 'f', v => target('velux').evenFrame = v === 'even');
@@ -23610,7 +23874,16 @@ function pushRoofToEditor(){
   const ridges=R.links.map(L=>[
     [R.nodes[L.a][0]-o[0],R.nodes[L.a][1]-o[1]],
     [R.nodes[L.b][0]-o[0],R.nodes[L.b][1]-o[1]]]);
-  const rise=R.flat?0:Math.tan((R.pitch||30)*Math.PI/180)*roofRun(R);
+  /* THE HEIGHT IS WHAT THE ROOF SAYS IT IS (22j). This used to work the rise
+     out from the PITCH, and the editor hands its layout straight back -- so
+     a roof whose height came from the storeys, or from eaves and ridge typed
+     in, was pulled to the pitch's answer the moment any item was touched.
+     George found it changing a solar panel's size; a chimney would have done
+     it too. The pitch stays as the fallback for a roof with no heights. */
+  const rise=R.flat?0
+    :((isFinite(R.ridge)&&isFinite(R.eaves)&&R.ridge>R.eaves)
+        ? (R.ridge-R.eaves)
+        : Math.tan((R.pitch||30)*Math.PI/180)*roofRun(R));
   let call=null, warnings=[];
   try{
     const r=RoofKit.toSetRoof(outline,ridges,
@@ -24489,6 +24762,7 @@ function syncItemOpts(){
   $('veluxOpts').style.display=isV?'':'none';
   $('stackOpts').style.display=isS?'':'none';
   $('solarOpts').style.display=isP?'':'none';
+  if($('solarSize')) $('solarSize').style.display=isP?'':'none';
   if(isV){
     const sel=$('veCode');
     if(!sel.options.length&&window.RoofKit&&RoofKit.VELUX){
@@ -24509,6 +24783,9 @@ function syncItemOpts(){
     $('soCols').value=(it.cols!=null?it.cols:4);
     $('soRows').value=(it.rows!=null?it.rows:2);
     $('soOrient').value=it.orientation||'portrait';
+    $('soScale').value=String(it.scale!=null?it.scale:1);
+    if($('soScaleVal'))
+      $('soScaleVal').textContent=Math.round((it.scale!=null?it.scale:1)*100)+'%';
   }
   $('dormerOpts').style.display=isD?'':'none';
   $('bayOpts').style.display=isB?'':'none';
@@ -25457,8 +25734,12 @@ function syncPlotItems(){
     if(fw) fw.style.display=(on&&PLOTMODE&&PLOTTOOL==='line')?'':'none';
     const bw=$('ptBoxSnapWrap');
     if(bw) bw.style.display=(on&&PLOTMODE&&PLOTTOOL==='rect')?'':'none';
+    /* 22l: WHENEVER THERE IS DECKING, not only while the decking tool is
+       armed. George laid a deck, went looking for the turn and could not
+       find it, because arming another tool took it off the bar. */
     const dw=$('ptDeckTurnWrap');
-    if(dw) dw.style.display=(on&&PLOTMODE==='deck')?'':'none';
+    const anyDeck=PLOTITEMS.some(it=>it&&it.type==='deck');
+    if(dw) dw.style.display=(on&&(PLOTMODE==='deck'||anyDeck))?'':'none';
   }
   /* UNDO LIVES IN THE MODE COLUMN NOW, so what it may take back is not a
      plot question: the stack itself decides, plus a pen with points in it. */
@@ -25513,7 +25794,31 @@ $('stPots').onchange=function(){ itemEditSet('pots',Math.max(1,Math.round(+this.
 $('stHeight').onchange=function(){ itemEditSet('height',Math.max(0.3,+this.value||1.1)); };
 $('soCols').onchange=function(){ itemEditSet('cols',Math.max(1,Math.round(+this.value||1))); };
 $('soRows').onchange=function(){ itemEditSet('rows',Math.max(1,Math.round(+this.value||1))); };
-$('soOrient').onchange=function(){ itemEditSet('orientation',this.value); };
+$('soOrient').onchange=function(){
+  /* the same flip on the item's own controls: the counts swap with it */
+  const it=(ROOF&&ROOF.items&&ITEMSEL!=null)?ROOF.items[ITEMSEL]:null;
+  const want=this.value;
+  if(it&&(it.orientation||'portrait')!==want){
+    const c=(it.cols!=null?it.cols:4), r=(it.rows!=null?it.rows:2);
+    itemEditSet('cols',r);
+    itemEditSet('rows',c);
+  }
+  itemEditSet('orientation',want);
+};
+/* ONE PRESS TURNS THE ARRAY (22n): the same swap Portrait/Landscape does */
+/* THE ARROW TURNS THE ARRAY (22o): a quarter turn of the same block. The
+   count swap that reshapes it stays on Portrait/Landscape, where the words
+   say what happens. */
+if($('soFlip')) $('soFlip').onclick=function(){
+  const it=(ROOF&&ROOF.items&&ITEMSEL!=null)?ROOF.items[ITEMSEL]:null;
+  if(!it||it.type!=='solar') return;
+  itemEditSet('rot',(((it.rot||0)+90)%360+360)%360);
+};
+$('soScale').oninput=function(){
+  const v=Math.max(0.5,Math.min(2,+this.value||1));
+  if($('soScaleVal')) $('soScaleVal').textContent=Math.round(v*100)+'%';
+  itemEditSet('scale',v);
+};
 $('itemEditClose').onclick=()=>{
   ITEMSEL=null;
   $('itemDel').disabled=true;
@@ -26060,7 +26365,12 @@ $('ptUndo').onclick=()=>{
     pushUndone();                 // what the drawing looked like before this
     e.restore(); syncRedo(); syncPlotItems(); draw(); return;
   }
-  if(PLOTITEMS.length){ pushUndone(); PLOTITEMS.pop(); syncPlotItems(); draw(); }
+  /* NOTHING ON THE STACK MEANS NOTHING TO UNDO (22l). This used to pop the
+     last plot item anyway -- with no record of it, no way back, and no
+     relation to what was actually last done. It is what took George's items
+     when he undid a deck. */
+  ptSay('Nothing left to take back.');
+  syncPlotItems();
 };
 /* CLEAR DROPS WHAT IS ON SCREEN, WHICH INCLUDES A DRAWING IN PROGRESS.
    It only ever emptied PLOTITEMS, and syncPlotItems disabled it whenever that
@@ -26993,6 +27303,17 @@ canvas.addEventListener('pointerdown',e=>{
     accessClick([amx,amy]);
     draw(); return;
   }
+  if(MODE==='plot'&&VIEW&&!ERASEMODE){
+    /* the deck's own turn arrow (22n): a press on it turns that area */
+    const dk=deckTurnHit(ox,oy);
+    if(dk){
+      const was=dk.turn;
+      pushRedo('the boards you turned',()=>{ dk.turn=was; });
+      dk.turn=!deckTurned(dk);
+      ptSay('Boards turned on that decking.','Press the arrow again to turn them back.');
+      draw(); return;
+    }
+  }
   if(MODE==='plot'&&VIEW&&!LINECUT&&!ERASEMODE&&!SELADD
      &&!(DRAW&&isPlotPen(DRAW.kind))){
     /* The area label comes to hand before any tool does: a press on a label
@@ -27539,7 +27860,10 @@ canvas.addEventListener('pointerup',e=>{
     if(L>=0.4&&ROOF){
       const a=ridgeNode(RD.a,RD.ai), b=ridgeNode(RD.b,RD.bi);
       if(a!==b&&!ROOF.links.some(l=>(l.a===a&&l.b===b)||(l.a===b&&l.b===a))){
-        ROOF.links.push({a,b}); clearRedo();
+        /* 22m: an undo entry of its own, and it is the REDO history that a
+           fresh edit invalidates -- clearRedo here wiped the undo stack */
+        pushRedo('the ridge you added',snapRoof(ROOF));
+        ROOF.links.push({a,b}); clearUndone();
         $('roofHint').textContent='Ridge added, '+L.toFixed(2)+' m'
           +(RD.how?' — end snapped to '+RD.how:'')+'. '
           +ROOF.links.length+' line'+(ROOF.links.length===1?'':'s')
@@ -27589,7 +27913,7 @@ canvas.addEventListener('pointerup',e=>{
       const sp=snapPoint(mx,my);
       // snapping back onto the start point closes the shape
       if(sp.how==='start point'&&DRAW.pts.length>=3){ finishDraw(); return; }
-      DRAW.pts.push(sp.pt); clearRedo();
+      DRAW.pts.push(sp.pt); clearUndone();
       $('roofHint').textContent='Drawing '+DRAW.kind+' — '+DRAW.pts.length+' corner'
         +(DRAW.pts.length>1?'s':'')+(sp.how?'  · snapped to '+sp.how:'');
       draw(); return;
@@ -27745,13 +28069,26 @@ canvas.addEventListener('contextmenu',e=>{      // right-click: undo the last po
      back the last outline point and the last ridge. Only when nothing else is
      in hand: a right-click while drawing an outline or a ridge still belongs
      to that, which is why this sits after neither and before nothing. */
+  /* WITH THE DECK TOOL ARMED, RIGHT-CLICK IS UNDO (22o): a deck lands as
+     four ridge lines at once, and taking those back one at a time is not
+     what anyone means by a right-click. */
+  if(MODE==='roof'&&typeof DECKMODE!=='undefined'&&DECKMODE){
+    e.preventDefault();
+    DD=null;
+    $('ptUndo').onclick();
+    return;
+  }
   if(MODE==='roof'&&ROOF&&!RIDGEMODE&&!DRAW&&!PLACE
      &&ROOF.items&&ROOF.items.length){
     e.preventDefault();
     const gone=ROOF.items.pop();
     ITEMSEL=null;
     if($('itemDel')) $('itemDel').disabled=true;
-    clearRedo();
+    /* 22m: on the stack, where it never was -- and it is the REDO history a
+       fresh edit clears, not the undo stack */
+    { const R2=ROOF, was=gone;
+      pushRedo('the '+itemLabel(was)+' you removed',()=>{ R2.items.push(was); }); }
+    clearUndone();
     $('roofHint').textContent=itemLabel(gone)+' removed — '+ROOF.items.length
       +' item'+(ROOF.items.length===1?'':'s')+' left on this roof.';
     syncEditor(); draw(); roofReport(); return;
