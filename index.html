@@ -222,6 +222,11 @@
      which is both simpler and something a gate can dispatch at. */
   button.split{display:flex;align-items:stretch;gap:0;padding:0;overflow:hidden}
   button.split>span{padding:7px 4px;flex:1;text-align:center}
+  /* the plus and minus share the button equally (22q): they are not the
+     narrow glyph halves the rule below makes of brush and line */
+  button.split>span[data-half="add"],
+  button.split>span[data-half="remove"]{flex:1 1 0;font-size:15px;line-height:1}
+  button.split>span[data-half="remove"]{border-left:1px solid var(--line)}
   button.split>span[data-half="brush"],
   button.split>span[data-half="line"],
   button.split>span[data-half="cut"],
@@ -426,8 +431,8 @@
       <div class="rbpair">
         <button id="modePlot" class="ghost">Plot</button>
         <button id="modeRoof" class="ghost" disabled>Roof</button>
-        <button id="selAdd" class="ghost"
-                title="Tap plots to add them to the highlight, or tap a highlighted one to take it out. Shift-click does the same on a keyboard.">Add plots</button>
+        <button id="selAdd" class="ghost split"
+                title="Plus: tap plots to add them to the highlight. Minus: tap highlighted plots to take them out."><span data-half="add" title="Add plots to the highlight">+</span><span data-half="remove" title="Take plots out of the highlight">−</span></button>
       </div>
       <div class="rbpair" style="margin-top:4px">
         <button id="itSelect" class="ghost"
@@ -714,6 +719,8 @@
               <button id="ghostCal" class="ghost" style="margin:0;padding:3.6px 5.4px;font-size:10px"
                       title="Two clicks on the plan, then the distance in metres">Set scale</button>
               <button id="ghostDel" class="ghost" style="margin:0;padding:3.6px 5.4px;font-size:10px">Remove</button>
+              <button id="ghostSet" class="ghost" style="margin:0;padding:3.6px 7px;font-size:10px;font-weight:600"
+                      title="Lock the plan where it stands and close this panel">Set plan</button>
             </div>
           </div>
           <div id="ghostFloors" style="margin-top:6px"></div>
@@ -813,7 +820,7 @@
        it scrolled away on a long page and had to be chased. -->
   <div id="plotPop" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;
        padding:8px 10px;background:#fdfcf9;border:1px solid #d9d6cc;border-radius:8px;
-       box-shadow:0 6px 18px rgba(0,0,0,.14);min-width:186px">
+       box-shadow:0 6px 18px rgba(0,0,0,.14);min-width:340px">
     <div class="row" id="brushOpts" style="margin:0;gap:6px;align-items:center">
       <label style="margin:0;font-size:11px;white-space:nowrap">Width</label>
       <input type="range" id="ptBrushSlide" min="0.2" max="6" step="0.1" value="0.6"
@@ -9797,7 +9804,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-22o';
+const BUILD='build 2026-08-22v';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -9980,15 +9987,34 @@ function selArea(){
    does; off, a tap starts again, which is the behaviour everyone already
    knows. */
 let SELADD=false;
+/* PLUS AND MINUS (22p). SELADD is 'add', 'remove' or false. One mode that
+   did both by toggling meant a second tap on a plot you meant to keep
+   quietly dropped it; now + only adds and - only removes. */
 function setSelAdd(on,quiet){
-  SELADD=(on===undefined)?!SELADD:!!on;
+  if(on===undefined) on=SELADD?false:'add';
+  else if(on===true) on='add';
+  SELADD=(on==='add'||on==='remove')?on:false;
   const b=$('selAdd');
-  if(b){ b.classList.toggle('on',SELADD);
-         b.style.background=SELADD?'#f1efe8':'transparent'; }
-  if(!quiet) say(SELADD
-    ? 'Tap plots to add them to the highlight. Tap a highlighted one to take it out.'
-    : 'Back to one plot at a time.');
+  if(b){
+    b.classList.toggle('on',!!SELADD);
+    b.style.background=SELADD?'#f1efe8':'transparent';
+    b.querySelectorAll('[data-half]').forEach(sp=>{
+      sp.style.background=(SELADD&&sp.dataset.half===SELADD)?'#e4e0d4':'';
+    });
+  }
+  if(!quiet) say(SELADD==='add'
+    ? 'Tap plots to add them to the highlight.'
+    : SELADD==='remove'
+      ? 'Tap highlighted plots to take them out.'
+      : 'Back to one plot at a time.');
 }
+/* the press decides by the half it landed on; the same half again stands
+   the mode down */
+if($('selAdd')) $('selAdd').onclick=(e)=>{
+  const half=(e&&e.target&&e.target.dataset)?e.target.dataset.half:null;
+  const want=(half==='remove')?'remove':'add';
+  setSelAdd(SELADD===want?false:want);
+};
 function selToggle(i){
   if(i===SEL){
     if(!SELSET.size) return false;               // nothing to hand the anchor to
@@ -12575,6 +12601,27 @@ function renderScene(g,W,H,live,scale,skipFurniture){
       g.setLineDash([8*k,6*k]); g.lineWidth=2.4*k; g.strokeStyle=ridgeColour(null);
       g.strokeRect(Math.min(ax,bx),Math.min(ay,by),Math.abs(bx-ax),Math.abs(by-ay));
       g.setLineDash([]);
+      /* AND ITS TWO SIDES (22r), each on the edge it measures. The corners
+         are the same four the commit builds -- the box is screen-aligned,
+         so the sides are measured between the map points of its corners. */
+      const tl=screenToMap(Math.min(ax,bx),Math.min(ay,by));
+      const tr=screenToMap(Math.max(ax,bx),Math.min(ay,by));
+      const bl=screenToMap(Math.min(ax,bx),Math.max(ay,by));
+      const w=Math.hypot(tr[0]-tl[0],tr[1]-tl[1]);
+      const h=Math.hypot(bl[0]-tl[0],bl[1]-tl[1]);
+      const lab=(x0,y0,x1,y1,txt)=>{
+        const lx=(x0+x1)/2, ly=(y0+y1)/2;
+        g.font=(11*k)+'px ui-monospace,Menlo,monospace';
+        g.textAlign='center'; g.textBaseline='middle';
+        const mt=g.measureText(txt);
+        const w2=((mt&&isFinite(mt.width))?mt.width:txt.length*6*k)+6*k;
+        g.fillStyle='rgba(253,252,249,0.92)';
+        g.fillRect(lx-w2/2,ly-7*k,w2,14*k);
+        g.fillStyle='rgba(24,64,44,0.98)';
+        g.fillText(txt,lx,ly);
+      };
+      if(w>0.05) lab(Math.min(ax,bx),Math.min(ay,by),Math.max(ax,bx),Math.min(ay,by),w.toFixed(2)+' m');
+      if(h>0.05) lab(Math.min(ax,bx),Math.min(ay,by),Math.min(ax,bx),Math.max(ay,by),h.toFixed(2)+' m');
     }
     // junction nodes — handles for dragging, so the active roof on screen only
     if(live&&active&&!outlineEditHides(R)) R.nodes.forEach((n,i)=>{
@@ -12644,6 +12691,28 @@ function renderScene(g,W,H,live,scale,skipFurniture){
      snap ring is the only thing telling you what the NEXT click will grab, and
      it was hidden for the one click where you most need it — the first, which
      has to land on a boundary for the cut to work at all. */
+  /* EVERY LEG ALREADY LAID CARRIES ITS LENGTH (22r), so a plot line can be
+     checked leg by leg rather than only at the end. The piece in hand has
+     carried its own since 21c. */
+  if(live&&DRAW&&isPlotPen(DRAW.kind)&&DRAW.pts.length>1){
+    g.save();
+    g.font=(11*k)+'px ui-monospace,Menlo,monospace';
+    g.textAlign='center'; g.textBaseline='middle';
+    for(let i=0;i<DRAW.pts.length-1;i++){
+      const a=DRAW.pts[i], b=DRAW.pts[i+1];
+      const len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(len<0.2) continue;
+      const lx=(X(a[0],a[1])+X(b[0],b[1]))/2, ly=(Y(a[0],a[1])+Y(b[0],b[1]))/2;
+      const txt=len.toFixed(2)+' m';
+      const mt=g.measureText(txt);
+      const w2=((mt&&isFinite(mt.width))?mt.width:txt.length*6*k)+6*k;
+      g.fillStyle='rgba(253,252,249,0.9)';
+      g.fillRect(lx-w2/2,ly-7*k,w2,14*k);
+      g.fillStyle='rgba(24,64,44,0.95)';
+      g.fillText(txt,lx,ly);
+    }
+    g.restore();
+  }
   if(live&&DRAW&&isPlotPen(DRAW.kind)&&DRAW.pts.length&&PENHOVER){
     const pend=penPendingPath(PENHOVER);
     if(pend){
@@ -12842,6 +12911,7 @@ function renderScene(g,W,H,live,scale,skipFurniture){
   if(live) try{ drawHaloPreview(g,W,H,view); }catch(_){}
   /* the area labels are ANNOTATION: both passes, so the sheet carries them */
   try{ drawAreaLabels(g,X,Y,k||1,!!live); }catch(_){}
+  if(live) try{ drawOutlineLengths(g,X,Y,k||1); }catch(_){}
   if(live) try{ drawLinkLengths(g,X,Y,k||1); }catch(_){}
   if(live) try{ drawPlaceDims(g,X,Y,k||1); }catch(_){}
   if(live) try{ drawRidgeMeasure(g,X,Y,k||1); }catch(_){}
@@ -13674,9 +13744,16 @@ function drawHaloPreview(g,W,H,view){
 function haloRoadSegs(ringsIn,areasIn){
   const rs=ringsIn||haloShapeRings();
   const src=areasIn||AREAS||[];
+  /* A FRONTAGE FACES A ROAD, NOT A PAVEMENT (22t). MasterMap's roads theme
+     includes the roadside strips, and a pavement runs up the side of many a
+     plot -- so side edges were counting as frontage and the road reach was
+     being laid out sideways as well. Only 'Road Or Track' itself makes an
+     edge a frontage, and it must be within a pavement's width of the edge. */
   const roads=[];
   for(const f of src){
     if(!f||!f.properties||!themeHas(f.properties,'Roads Tracks And Paths')) continue;
+    const dg=String(f.properties.DescriptiveGroup||'');
+    if(dg&&dg.indexOf('Road Or Track')<0) continue;
     for(const r of rings(f.geometry)) roads.push(r);
   }
   const out=[];
@@ -13693,10 +13770,19 @@ function haloRoadSegs(ringsIn,areasIn){
       if(pip([m[0]+n[0]*0.25,m[1]+n[1]*0.25],closed)) n=[-n[0],-n[1]];
       let hits=0;
       for(const t of [0.25,0.5,0.75]){
-        const p=[a[0]+dx*t+n[0]*0.35, a[1]+dy*t+n[1]*0.35];
-        for(const rr of roads){ if(pip(p,[...rr,rr[0]])){ hits++; break; } }
+        /* probe outward across a pavement's width: the road itself may sit
+           a few metres beyond the edge */
+        let hit=false;
+        for(const s2 of [0.35,1.5,3,4.5]){
+          const p=[a[0]+dx*t+n[0]*s2, a[1]+dy*t+n[1]*s2];
+          for(const rr of roads){ if(pip(p,[...rr,rr[0]])){ hit=true; break; } }
+          if(hit) break;
+        }
+        if(hit) hits++;
       }
-      if(hits===3) out.push([a.slice(),b.slice()]);
+      /* the outward normal travels with the segment (22t): the band is laid
+         along it, into the road, rather than stroked round the edge */
+      if(hits===3) out.push([a.slice(),b.slice(),[n[0],n[1]]]);
     }
   }
   return out;
@@ -13751,23 +13837,44 @@ function haloCanvas(W,H,view,ringsIn,segsIn){
       g2.fill();
       if(d>0){ g2.lineWidth=2*d*S; g2.stroke(); }
     };
-    const roadPath=(g2,d)=>{
+    const roadPath=(g2,d,dr)=>{
       if(!segs.length||!(d>0)) return;
-      g2.lineWidth=2*d*S;
+      /* INTO THE ROAD, NOT SIDEWAYS (22t). Stroking the edge with a
+         round-capped line as wide as twice the reach made a stadium that
+         reached the full distance in every direction. A quad projected
+         outward along the edge's own normal reaches the road and nothing
+         else. Segments without a normal (older callers) fall back to the
+         stroke. */
       g2.beginPath();
+      let stroked=false;
       for(const sg2 of segs){
-        const a=maskProject(view,sg2[0][0],sg2[0][1]);
-        const b=maskProject(view,sg2[1][0],sg2[1][1]);
-        g2.moveTo(a[0],a[1]); g2.lineTo(b[0],b[1]);
+        const a=sg2[0], b=sg2[1], n=sg2[2];
+        if(!n){
+          const pa=maskProject(view,a[0],a[1]), pb=maskProject(view,b[0],b[1]);
+          g2.lineWidth=2*d*S; g2.moveTo(pa[0],pa[1]); g2.lineTo(pb[0],pb[1]); stroked=true;
+          continue;
+        }
+        const q=[a,b,[b[0]+n[0]*d,b[1]+n[1]*d],[a[0]+n[0]*d,a[1]+n[1]*d]]
+          .map(p=>maskProject(view,p[0],p[1]));
+        g2.moveTo(q[0][0],q[0][1]);
+        for(let i=1;i<4;i++) g2.lineTo(q[i][0],q[i][1]);
+        g2.closePath();
       }
-      g2.stroke();
+      g2.fill();
+      /* SOFT SIDES (22u). A bare quad has hard sides while the plot's own
+         fade round it is soft, so the band read as a slab dropped onto the
+         road. Rounding each pass's quad by that pass's RING reach makes the
+         sides fall away over the same distance the plot's edge does; the
+         reach into the road is unchanged. */
+      if(dr>0){ g2.lineWidth=2*dr*S; g2.stroke(); }
+      else if(stroked) g2.stroke();
     };
     og.lineJoin='round'; og.lineCap='round';
     og.fillStyle='#000'; og.strokeStyle='#000';
     for(const pass of haloPasses(view,segs.length>0,HALO_BANDS)){
       og.globalAlpha=pass.alpha;
       path(og,pass.dRing);
-      roadPath(og,pass.dRoad);
+      roadPath(og,pass.dRoad,pass.dRing);
     }
     og.globalAlpha=1;
     return out;
@@ -15534,6 +15641,15 @@ function finishDraw(){
   }
   const s={kind:DRAW.kind,pts:DRAW.pts.slice()};
   s.area=ringArea([...s.pts,s.pts[0]]);
+  /* CLOSING AN OUTLINE IS AN EDIT (22s). It pushed nothing, so a formed
+     outline could not be taken back at all -- the pen's points could, right
+     up until the moment they became a shape. */
+  const wasRoof=ROOF, wasSel=ROOFSEL;
+  pushRedo('the '+s.kind+' outline you closed',()=>{
+    const at=SHAPES.indexOf(s); if(at>=0) SHAPES.splice(at,1);
+    ROOF=wasRoof; ROOFSEL=wasSel; RIDGESEL=null;
+    try{ syncItems(); syncRoofPick(); roofReport(); }catch(_){}
+  });
   SHAPES.push(s); DRAW=null;
   /* Closing the outline sets the roof area. It used to ask for a double-click,
      which stopped working when double-click stopped solving roofs — leaving no
@@ -15556,9 +15672,17 @@ $('drawMain').onclick=()=>beginDraw(outlineKind());
    Pushing a new edit clears the stack, as in any editor: the snapshots are
    whole-object, so replaying one over later work would wipe it. */
 let REDO=[];
+/* set only while Redo is putting something back: a redo must not throw away
+   the rest of the trail it is walking */
+let REDOING=false;
 function pushRedo(what,restore){
   REDO.push({what,restore});
   if(REDO.length>40) REDO.shift();
+  /* A NEW EDIT ENDS THE REDO TRAIL (22s). Undo an item, draw something
+     else, press Redo, and Redo was putting back a snapshot taken before
+     that something else -- quietly wiping it. Done HERE so no edit can
+     forget to do it. */
+  if(!REDOING&&typeof clearUndone==='function') clearUndone();
   syncRedo();
 }
 function clearRedo(){ if(REDO.length){ REDO=[]; syncRedo(); } }
@@ -15634,6 +15758,8 @@ function snapRoof(R){
 $('redoBtn').onclick=()=>{
   const back=UNDONE.pop();
   if(!back){ syncRedo(); return; }
+  REDOING=true;
+  try{
   /* PUTTING SOMETHING BACK IS ITSELF AN EDIT (21w). Redo used to restore
      the drawing and leave the undo stack empty, so there was nothing to
      take away again. It records its own way back now, like everything
@@ -15643,6 +15769,7 @@ $('redoBtn').onclick=()=>{
   if(back.fn){
     back.fn(); draw(); syncPlotItems(); syncRedo();
     $('roofHint').textContent='Put back.';
+    REDOING=false;
     return;
   }
   if(applySnapshot(back.snap)){
@@ -15651,6 +15778,7 @@ $('redoBtn').onclick=()=>{
     $('roofHint').textContent='Put back.';
     try{ roofReport(); }catch(_){}
   }
+  } finally { REDOING=false; }
   syncRedo();
 };
 /* THE OUTLINE'S OWN UNDO IS GONE (21u): one button for the whole drawing,
@@ -15660,9 +15788,11 @@ $('redoBtn').onclick=()=>{
 function undoDrawnPoint(){
   if(!DRAW||!DRAW.pts||!DRAW.pts.length) return false;
   const kept=DRAW.pts.map(q=>q.slice()), keptKind=DRAW.kind;
-  pushUndone(()=>{ DRAW={kind:keptKind,pts:kept.map(q=>q.slice())}; });
   const pts=DRAW.pts.map(q=>q.slice()), kind=DRAW.kind;
+  /* the redo entry FIRST: pushRedo ends the redo trail (22s), so recording
+     the way back before it would throw that record away */
   pushRedo('the point you removed',()=>{ DRAW={kind,pts:pts.map(q=>q.slice())}; });
+  pushUndone(()=>{ DRAW={kind:keptKind,pts:kept.map(q=>q.slice())}; });
   DRAW.pts.pop(); draw();
   return true;
 }
@@ -18263,6 +18393,44 @@ function ridgeHoverAt(p){
 /* the two dimensions, drawn along the wall itself */
 /* EVERY ROOF LINE CARRIES ITS LENGTH (22n): ridge, hip, valley -- and so the
    roof deck's four lines too. Working chrome, live pass only. */
+/* THE OUTLINE'S OWN EDGES (22s): the one being drawn, and the active roof's,
+   each edge measured at its midpoint. Live pass only, like every other
+   working figure. */
+function drawOutlineLengths(g,X,Y,k){
+  if(MODE!=='roof') return;
+  const rings=[];
+  if(DRAW&&DRAW.pts&&DRAW.pts.length>1) rings.push({pts:DRAW.pts,closed:false});
+  /* THE EDGE IN HAND (22t): last corner to the cursor, so a wall can be set
+     out to a figure before the corner goes down */
+  if(DRAW&&DRAW.pts&&DRAW.pts.length&&PENHOVER)
+    rings.push({pts:[DRAW.pts[DRAW.pts.length-1],PENHOVER],closed:false});
+  for(const sh of SHAPES){
+    if(!sh||!sh.pts||sh.pts.length<3) continue;
+    if(ROOF&&ROOF.shape&&ROOF.shape!==sh) continue;   // the active roof's own
+    rings.push({pts:sh.pts,closed:true});
+  }
+  if(!rings.length) return;
+  g.save();
+  g.font=(10*k)+'px ui-monospace,Menlo,monospace';
+  g.textAlign='center'; g.textBaseline='middle';
+  for(const r of rings){
+    const n=r.closed?r.pts.length:r.pts.length-1;
+    for(let i=0;i<n;i++){
+      const a=r.pts[i], b=r.pts[(i+1)%r.pts.length];
+      const len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(len<0.3) continue;
+      const mx=(X(a[0],a[1])+X(b[0],b[1]))/2, my=(Y(a[0],a[1])+Y(b[0],b[1]))/2;
+      const txt=len.toFixed(2)+' m';
+      const mt=g.measureText(txt);
+      const w2=((mt&&isFinite(mt.width))?mt.width:txt.length*6*k)+6*k;
+      g.fillStyle='rgba(253,252,249,0.85)';
+      g.fillRect(mx-w2/2,my-6*k,w2,12*k);
+      g.fillStyle='rgba(24,64,44,0.9)';
+      g.fillText(txt,mx,my);
+    }
+  }
+  g.restore();
+}
 function drawLinkLengths(g,X,Y,k){
   if(MODE!=='roof'||!ROOF||!ROOF.links||!ROOF.links.length||!ROOF.nodes) return;
   /* ONLY WHILE A RIDGE IS BEING DRAWN (22o): that is when a length is being
@@ -24980,6 +25148,18 @@ $('ghostRot').addEventListener('input',function(){ ghostSetRot(this.value); });
 $('ghostRotN').addEventListener('change',function(){ ghostSetRot(this.value); });
 $('ghostOp').addEventListener('input',function(){
   if(GHOST){ GHOST.opacity=(+this.value)/100; draw(); } });
+/* SET PLAN (22v): lock it where it stands and put the panel away, in one
+   press -- the end of placing a plan, which is what the panel is open for. */
+if($('ghostSet')) $('ghostSet').onclick=function(){
+  if(GHOST){
+    GHOST.locked=true;
+    GHOSTDRAG=null;
+    if($('ghostLock')) $('ghostLock').textContent='Unlock';
+    $('roofHint').textContent='Plan set. Unlock in Plan… to move it again.';
+  }
+  popShow('ghostPop',false);
+  draw();
+};
 $('ghostLock').onclick=function(){
   if(!GHOST) return;
   GHOST.locked=!GHOST.locked;
@@ -25010,7 +25190,17 @@ function popShow(id,on){
       if(other!==id&&$(other)) $(other).style.display='none';
   }
 }
-if($('ghostOpen')) $('ghostOpen').onclick=()=>popShow('ghostPop');
+if($('ghostOpen')) $('ghostOpen').onclick=()=>{
+  popShow('ghostPop');
+  /* OPENING THE PANEL IS ASKING TO PLACE THE PLAN (22v): it comes unlocked
+     so it can be dragged straight away, and Set plan puts it back. */
+  if(GHOST&&$('ghostPop')&&$('ghostPop').style.display!=='none'){
+    GHOST.locked=false;
+    if($('ghostLock')) $('ghostLock').textContent='Lock';
+    $('roofHint').textContent='Drag the plan to place it. Set plan when it sits right.';
+    draw();
+  }
+};
 if($('exportOpen')) $('exportOpen').onclick=()=>popShow('exportPop');
 document.addEventListener('pointerdown',e=>{
   for(const id of ['ghostPop','exportPop']){
@@ -25018,6 +25208,11 @@ document.addEventListener('pointerdown',e=>{
     if(!el||el.style.display==='none') continue;
     const btn=$(id==='ghostPop'?'ghostOpen':'exportOpen');
     if(el.contains(e.target)||(btn&&btn.contains(e.target))) continue;
+    /* THE MAP IS NOT 'OUTSIDE' FOR THE PLAN PANEL (22v). A press on the map
+       is the press that starts dragging the plan, and closing the panel on
+       it meant reopening the thing after every nudge. Everything else still
+       closes it. */
+    if(id==='ghostPop'&&e.target===canvas) continue;
     el.style.display='none';
   }
 },true);
@@ -26439,7 +26634,6 @@ function setMode(m){
   $('modeRoof').style.background=m==='roof'?'#f1efe8':'transparent';
   draw();
 }
-$('selAdd').onclick=()=>setSelAdd();
 $('modePlot').onclick=()=>setMode('plot');
 $('modeRoof').onclick=()=>setMode('roof');
 /* Ridge mode swallows clicks on the roof, so anything else that wants them has
@@ -27605,9 +27799,9 @@ canvas.addEventListener('pointermove',e=>{      // snap preview while drawing
   const [mx,my]=screenToMap(e.clientX-r.left,e.clientY-r.top);
   const before=SNAPHIT?SNAPHIT.join(','):'';
   const sp=snapPoint(mx,my);
-  if(DRAW&&isPlotPen(DRAW.kind)){
-    /* EITHER pen redraws on every move: the pending piece and its tape
-       follow the cursor, not just the snap ring */
+  if(DRAW&&(isPlotPen(DRAW.kind)||MODE==='roof')){
+    /* EITHER plot pen -- and the roof outline pen too (22t) -- redraws on
+       every move: the pending piece and its length follow the cursor */
     PENHOVER=sp.pt.slice();
     draw(); return;
   }
@@ -27630,6 +27824,9 @@ canvas.addEventListener('pointerup',e=>{
        which is a click that slipped rather than a distance anyone wanted. */
     if(L<0.05){ say('Too short — drag to measure a distance.'); draw(); return; }
     RULERS.push(D);
+    /* it stays off the UNDO stack, but it is still an edit, so what could be
+       redone is no longer safe to put back (22s) */
+    clearUndone();
     /* NOT ON THE SHARED STACK (21u). Measurements have their own arrow
        inside the Measure button; leaving them here meant the general Undo
        ate a measurement before it reached the thing he actually meant to
@@ -27997,7 +28194,22 @@ canvas.addEventListener('pointerup',e=>{
          the old behaviour is exactly what you get without the key down */
       /* the key OR the mode: an iPad has no shift, and the two do the same
          thing so nothing anyone already knows has changed */
-      if((e.shiftKey||SELADD)&&SEL>=0&&i!==SEL){ selToggle(i); draw(); showSel(); return; }
+      /* shift-click keeps its toggle; the + and - halves do one thing each */
+      if(SELADD==='add'&&SEL>=0){
+        if(i!==SEL&&!SELSET.has(i)) SELSET.add(i);
+        draw(); showSel(); return;
+      }
+      if(SELADD==='remove'&&SEL>=0){
+        if(i===SEL&&!SELSET.size){
+          /* THE LAST HIGHLIGHTED PLOT GOES TOO (22q): the anchor could only
+             be handed on, so with nothing else highlighted a tap on it did
+             nothing. No plot highlighted is a state the tools already
+             tolerate; the next plain tap picks one fresh. */
+          SEL=-1; SELSET.clear();
+        } else if(i===SEL||SELSET.has(i)) selToggle(i);
+        draw(); showSel(); return;
+      }
+      if(e.shiftKey&&SEL>=0&&i!==SEL){ selToggle(i); draw(); showSel(); return; }
       SEL=i; SELSET.clear(); draw(); showSel(); return;
     }
   }
@@ -28075,6 +28287,15 @@ canvas.addEventListener('contextmenu',e=>{      // right-click: undo the last po
   if(MODE==='roof'&&typeof DECKMODE!=='undefined'&&DECKMODE){
     e.preventDefault();
     DD=null;
+    $('ptUndo').onclick();
+    return;
+  }
+  /* WITH NOTHING IN HAND, RIGHT-CLICK ON THE ROOF IS UNDO (22s) -- the same
+     as it is with the deck tool armed. It only reaches here when there is no
+     furniture to take back, which is what the branch below is for. */
+  if(MODE==='roof'&&!RIDGEMODE&&!DRAW&&!PLACE
+     &&!(ROOF&&ROOF.items&&ROOF.items.length)){
+    e.preventDefault();
     $('ptUndo').onclick();
     return;
   }
