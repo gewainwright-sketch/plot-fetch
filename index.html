@@ -10,7 +10,7 @@
     --bld:#e2c4ba; --road:#f7f3e8;
     /* Plot furniture. Dark green, dark grey, light grey — chosen to stay
        apart from each other at export scale and from the base map beneath. */
-    --hedge:#2f6b3a; --drive:#6b6f72; --path:#c6c9c6; --deck:#9a7649; --patio:#f4f3f0;
+    --hedge:#2f6b3a; --drive:#6b6f72; --path:#c6c9c6; --deck:#9a7649; --patio:#e4e1d6;
     /* THE SELECTED PLOT GOES GREEN ON PAPER, YELLOW ON SCREEN. Yellow earns
        its place on screen, where it has to shout which plot is live. On an
        export it is the loudest thing on a drawing whose subject is the roof,
@@ -238,6 +238,12 @@
     font-size:13px;line-height:1.1}
   button.split>span:hover{background:#f1efe8}
   #plotItemsCol .rbpair{grid-template-columns:repeat(2,1fr)}
+  /* BUILDING MODE, NO TALLER THAN THE OTHERS (24c): tighter buttons, the two
+     sliders on one row, and the stat line a size smaller */
+  #bldCol .rbpair{gap:3px}
+  #bldCol button.ghost{padding:3px 6px;font-size:11px;line-height:1.25}
+  #bldCol .row{margin-top:3px!important}
+  #bldCol input[type=range]{width:64px!important}
   /* A FIXED HEIGHT, NOT A MINIMUM. min-height stopped the panel SHRINKING but
      not growing, so a three line message still made the sticky bar taller, the
      map area shorter, and fit() rescaled the whole drawing — which reads as the
@@ -411,13 +417,23 @@
        stands on a facet and which way it faces is a real choice. Square puts
        it back up the fall of the facet it is on, which is what the roof-wide
        Square items button does to the lot. -->
-  <div class="row" id="rotRow" style="display:none;margin:6px 0 0;gap:4px;align-items:center">
-    <label style="margin:0;font-size:10.5px;width:52px">Rotate</label>
-    <input type="range" id="itRot" min="0" max="359" step="1" style="margin:0;flex:1"
-           title="Which way the item faces, degrees clockwise">
-    <span id="itRotVal" style="font:11px ui-monospace,Menlo,monospace;min-width:34px;text-align:right"></span>
-    <button id="itRotSq" class="ghost" style="margin:0;width:auto;padding:2px 6px;font-size:11px"
-            title="Square it to the facet it stands on">Square</button>
+  <!-- TWO LINES, NOT ONE (24y). Label, slider, readout and Square together
+       overran the 250 px panel and cut Square off at the edge; a second
+       button would only have squeezed it further. The slider keeps the full
+       width, and the two buttons sit under it with room for their words. -->
+  <div id="rotRow" style="display:none;margin:6px 0 0">
+    <div class="row" style="margin:0;gap:4px;align-items:center">
+      <label style="margin:0;font-size:10.5px;width:52px">Rotate</label>
+      <input type="range" id="itRot" min="0" max="359" step="1" style="margin:0;flex:1"
+             title="Which way the item faces, degrees clockwise">
+      <span id="itRotVal" style="font:11px ui-monospace,Menlo,monospace;min-width:34px;text-align:right"></span>
+    </div>
+    <div class="row" style="margin:4px 0 0;gap:4px">
+      <button id="itRotSq" class="ghost" style="margin:0;flex:1;padding:3px 7px;font-size:11px"
+              title="Square it to the facet it stands on">Square</button>
+      <button id="itRot90" class="ghost" style="margin:0;flex:1;padding:3px 7px;font-size:11px"
+              title="Turn it ninety degrees clockwise">↻ 90°</button>
+    </div>
   </div>
   <div class="row" style="margin:7px 0 0;gap:4px">
     <button id="itemEditOpen" class="ghost" style="margin:0;padding:3px 7px;font-size:11px">Edit…</button>
@@ -431,6 +447,8 @@
       <div class="rbpair">
         <button id="modePlot" class="ghost">Plot</button>
         <button id="modeRoof" class="ghost" disabled>Roof</button>
+        <button id="modeBuilding" class="ghost" disabled
+                title="Put a building on the map from a plan, or take one off">Building</button>
         <button id="selAdd" class="ghost split"
                 title="Plus: tap plots to add them to the highlight. Minus: tap highlighted plots to take them out."><span data-half="add" title="Add plots to the highlight">+</span><span data-half="remove" title="Take plots out of the highlight">−</span></button>
       </div>
@@ -459,6 +477,47 @@
            copied. -->
       <div class="hint" id="ptHint"></div>
     </div>
+    <!-- BUILDING MODE: its own column, right of Mode, left of Road name (23b) -->
+    <div class="rbcol" id="bldCol" style="display:none">
+      <span class="rblab">Building</span>
+      <div id="bldRow">
+        <div class="rbpair">
+          <button id="bldLoad" class="ghost"
+                  title="Upload a floor plan, JPEG or PNG; its outline is traced for you">Upload plan</button>
+          <button id="bldCal" class="ghost" disabled
+                  title="Two clicks on the plan, then the distance in metres">Set scale</button>
+        </div>
+        <div class="rbpair" style="margin-top:4px">
+          <button id="bldExt" class="ghost"
+                  title="The plan's dimensions are to the outside of the walls">External</button>
+          <button id="bldInt" class="ghost"
+                  title="The plan's dimensions are room sizes: the outline is pushed out 0.3 m a side for the walls">Internal</button>
+        </div>
+        <div class="row" style="margin:3px 0 0;gap:3px;align-items:center;font-size:11px">
+          <label style="margin:0;font-size:11px" title="Turn">↻</label>
+          <input type="range" id="bldRot" min="-180" max="180" step="1" value="0" disabled
+                 style="width:64px;margin:0" title="Turn">
+          <span id="bldRotVal" style="min-width:30px">0°</span>
+          <label style="margin:0 0 0 4px;font-size:11px" title="Size against the scale you set">⤢</label>
+          <input type="range" id="bldSize" min="0" max="200" step="1" value="100" disabled
+                 style="width:64px;margin:0" title="Against the scale you set; 100% is the plan as measured">
+          <span id="bldSizeVal" style="min-width:30px">100%</span>
+        </div>
+        <div class="rbpair" style="margin-top:4px">
+          <button id="bldPlace" class="ghost" disabled
+                  title="Put the traced outline on the map as a building, for good">Place building</button>
+          <button id="bldRemove" class="ghost"
+                  title="Then tap a building to take it off the map, roof and all">Remove building</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:3px;margin-top:3px">
+          <button id="bldSplit" class="ghost"
+                  title="Drag a line across a building to cut it in two; or tap corners, and back to the first corner clears the inside">Split building</button>
+          <button id="bldClearRect" class="ghost" title="Clear: drag a box over the part of a building to take away">▭</button>
+          <button id="bldClearPoly" class="ghost" title="Clear: tap the corners of the part to take away, then press this again">∠</button>
+        </div>
+        <div id="bldStat" style="font-size:10px;color:#8a897f;margin:1px 0 0;line-height:1.2">No plan loaded.</div>
+      </div>
+    </div>
     <div class="rbcol" id="plotItemsCol">
       <span class="rblab">Plot items</span>
       <div class="rbpair">
@@ -472,6 +531,11 @@
         <button id="ptPath" class="ghost split"><span data-half="rect">Path</span><span data-half="brush" title="Paint along a line">〜</span><span data-half="line" title="Click a run out point by point, following the plot line">∠</span></button>
         <button id="ptClear" class="ghost split" disabled><span data-half="rect">Clear</span><span data-half="ebox" title="Drag a rectangle over what should go">▭</span><span data-half="ebrush" title="Rub over what should go">〜</span><span data-half="eline" title="Click a region out point by point">∠</span></button>
       </div>
+      <!-- the board turn is the arrow on the deck itself (24o); the menu
+           button 24n placed here is gone at George's word. The hidden tick
+           stays: it is the default for decking drawn NEXT, which deckTurned
+           falls back to for an item with no turn of its own. -->
+      <input type="checkbox" id="ptDeckTurn" style="display:none">
     </div>
     <div class="rbgroup" id="roofPanel" style="display:none">
       <!-- ONE COLUMN (22d): the outline pen leads, Ridge sits to its right,
@@ -542,7 +606,9 @@
                   title="Back to the north-west drawing light">Drawing light</button>
           <span id="sunNote" style="font:11px ui-monospace,Menlo,monospace;flex:1;text-align:right;opacity:.75"></span>
         </div>
-        <label class="rbchk" style="margin-top:6px"><input type="checkbox" id="shadowOn"> ground shadow</label>
+        <div style="margin-top:6px;font-size:11px;color:#6b6a62">Ground shadow</div>
+        <label class="rbchk" style="margin-top:2px"><input type="checkbox" id="shadowOn"> buildings</label>
+        <label class="rbchk" style="margin-top:2px"><input type="checkbox" id="shadowItems" checked> plot items</label>
         <label>Covering</label>
         <div class="row" style="margin-top:0">
           <select id="paletteSel" style="margin:0;flex:1" title="Slate palette for pitched roofs"></select>
@@ -605,12 +671,6 @@
       <label class="rbchk" id="ptBoxSnapWrap" style="display:none;margin:6px 0 0;font-size:11px"
              title="A rectangle's corners snap to the corners of items already laid, so a second box lands flush against the first">
         <input type="checkbox" id="ptBoxSnap" checked> snap to laid items</label>
-      <label class="rbchk" id="ptDeckTurnWrap" style="display:none;margin:6px 0 0;font-size:11px"
-             title="Run the boards the other way. Turns the decking already drawn as well as anything drawn next.">
-        <input type="checkbox" id="ptDeckTurn" style="display:none">
-        <button id="ptDeckTurnBtn" type="button" class="ghost"
-                style="margin:0;padding:3px 8px;font-size:11px"
-                title="Turn the boards ninety degrees on every deck laid">↻ turn boards</button></label>
       <div id="balcList" style="display:none;margin:6px 0 0"></div>
       <div class="row" id="parapetOpts" style="display:none;margin:6px 0 0;gap:4px">
         <label style="margin:0;font-size:11px;white-space:nowrap">Parapet</label>
@@ -842,7 +902,7 @@
       <div><span class="sw" style="background:var(--bld)"></span>Building</div>
       <div><span class="sw" style="background:var(--land)"></span>Land / yard</div>
       <div><span class="sw" style="background:var(--landsel)"></span>Plot</div>
-      <div><span class="ln" style="border-color:#5c5c58"></span>Wall / fence / hedge</div>
+      <div><span class="ln" style="border-color:#5c5c58"></span>Wall / fence</div>
       <div><span class="ln" style="border-color:#0a7a4e"></span>Division</div>
       <div><span class="ln" style="border-color:#96564a"></span>Building outline</div>
       <div><span class="ln" style="border-color:#0b8a3e"></span>Roof area outline</div>
@@ -8378,14 +8438,62 @@ function fpBandFills(walls, w, h){
   return fill;
 }
 
+/* THE SHEET'S OWN STROKE HALF-WIDTH: the 90th percentile of each ink pixel's
+   distance to background. Walls are most of the ink, so this is a wall's
+   half-thickness; the odd chimney breast, thicker, sits above the cut. */
+function fpStrokeHalf(ink, w, h){
+  const d2 = fpEdt2(ink, w, h);
+  const hist = new Int32Array(64); let n = 0;
+  for (let i = 0; i < w*h; i++) if (ink[i]){ hist[Math.min(63, Math.round(Math.sqrt(d2[i])))]++; n++; }
+  let acc = 0;
+  for (let v = 0; v < 64; v++){ acc += hist[v]; if (acc >= 0.9 * n) return Math.max(1, v); }
+  return 1;
+}
+/* SEAL THE ENVELOPE (24a). A door on a PlanUp sheet is a gap in the wall
+   with a swing arc drawn across it; the arc's ends stop just short of the
+   wall stubs, and that short gap is enough for the flood to pour through.
+   Closing the ink -- grow, then shrink back by the same amount -- bridges
+   any gap narrower than twice the radius and fattens nothing that survives.
+   The radius is FP_SEAL_MULT stroke half-widths -- five, so a gap of up to
+   five stroke widths bridges: a door arc's end lands within a stroke or two
+   of the wall stub, a room's width is tens. Measured on five PlanUp sheets,
+   seventeen floors (test-plans.js): the answer is flat from four to six and
+   collapses below three. Capped as a fraction of the sheet so a coarse scan
+   cannot close a courtyard. */
+const FP_SEAL_MULT = 5;
+function fpSealed(ink, w, h){
+  const half = fpStrokeHalf(ink, w, h);
+  const R = Math.max(1, Math.min(Math.round(FP_SEAL_MULT * half), Math.round(0.06 * Math.max(w, h))));
+  /* PADDED. The region is tightened onto the wall box, so every outer wall
+     sits within R of the edge; fpErode1 counts outside the image as
+     background and would eat those walls after the dilation is clipped,
+     opening the envelope the close just shut. A margin of R on each side
+     keeps the border out of reach. */
+  const pw = w + 2*R, ph = h + 2*R;
+  const pad = new Uint8Array(pw*ph);
+  for (let y = 0; y < h; y++) pad.set(ink.subarray(y*w, y*w + w), (y + R)*pw + R);
+  const closed = fpBoxEro(fpBoxDil(pad, pw, ph, R), pw, ph, R);
+  const out = new Uint8Array(w*h);
+  for (let y = 0; y < h; y++) out.set(closed.subarray((y + R)*pw + R, (y + R)*pw + R + w), y*w);
+  return out;
+}
 function fpFootprint(ink, walls, w, h){
   // The drawing seals most of its own openings: window symbols span their gap.
-  // Unsealed ones (patio doors) are bridged along the wall bounding box.
+  // Unsealed ones (patio doors) are bridged along the wall bounding box, and
+  // the door arcs are closed onto their stubs before anything floods (24a).
   const r = Math.max(2, Math.round(0.0015 * Math.max(w, h)));
   const bf = fpBandFills(walls, w, h);
   const bar = fpBoxDil(ink, w, h, r);
   for (let i = 0; i < w*h; i++) if (bf[i]) bar[i] = 1;
-  const outside = fpFloodOutside(bar, w, h);
+  /* THE SEAL DECIDES ONLY WHAT IS OUTSIDE. Closed ink also fattens every
+     partition, arc and label inside the house, which carved the interior
+     into pieces of which keep-largest kept one: Carr Road's ground floor
+     went from 80% to 45% of its box as the seal grew. So the sealed ink is
+     the flood's barrier, and the sheet's own ink is what the inside is
+     measured against. */
+  const seal = fpBoxDil(fpSealed(ink, w, h), w, h, r);
+  for (let i = 0; i < w*h; i++) if (bar[i]) seal[i] = 1;
+  const outside = fpFloodOutside(seal, w, h);
   const inside = new Uint8Array(w*h);
   for (let i = 0; i < w*h; i++) if (!outside[i] && !bar[i]) inside[i] = 1;
   const grown = fpBoxDil(inside, w, h, r + 1);
@@ -9522,6 +9630,7 @@ window.RoofGhost = {
   overlayMatrix: fpOverlayMatrix, regionToPlot: fpRegionToPlot,
   plotToRegion: fpPlotToRegion, overlayAABB: fpOverlayAABB,
   maskBBox: fpMaskBBox, wallPipeline: fpWallPipeline, footprint: fpFootprint,
+  strokeHalf: fpStrokeHalf, sealed: fpSealed, inkOf: fpInkOf, boxDil: fpBoxDil, boxEro: fpBoxEro,
   whiteCopy: fpWhiteCopy
 };
 })();
@@ -9804,7 +9913,7 @@ function distToRing(pt,r){let best=1e12;const[px,py]=pt;
    Three rounds were once lost to neither side knowing which of several
    downloads a screenshot came from, and a fourth to the same question this
    round; the stamp on the export footer makes any PNG self-identifying. */
-const BUILD='build 2026-08-22v';
+const BUILD='build 2026-08-25h';
 let PT=null, HALF=20, AREAS=[], LINES=[], SEL=-1, VIEW=null, ROT=0;
 /* A plot is often more than one polygon — a garden split by a path, a yard
    drawn separately from the strip it opens onto — and only one of them could
@@ -10031,6 +10140,58 @@ let ZOOM=1, PANX=0, PANY=0;          // display only — never touches the data
 let ROOFSEL=null, RIDGESEL=null, RIDGEMODE=false, RD=null;
 /* the deck tool: a rectangle drag that lands as FOUR RIDGE LINKS */
 let DECKMODE=false, DD=null;
+/* ============ A LAID DECK RESIZED BY ITS SIDE (22w) ==================
+   A deck lands as four ridge links in a rectangle. Its CORNERS have always
+   been draggable one at a time -- which moves one corner and leaves a
+   trapezium. George asked for the side: pull an edge and keep the shape.
+
+   The gesture is one link and its two nodes, moved along that link's OWN
+   perpendicular. The two sides square to it stretch for free, because they
+   share those nodes; the opposite side never moves at all. Anything else
+   welded to one of those corners travels with it, exactly as it does when
+   the corner is dragged on its own -- that is the same rule, not a new one.
+
+   Declared HERE, at the top with the other tool state, and not down beside
+   its functions: a let read before its declaration line has run is a
+   ReferenceError the parse check cannot see, and this file has already lost
+   a session to exactly that (see PADL in START-HERE). */
+let DECKSIDE=null;
+/* RESHAPING A LAID ITEM (24z). VTX is the corner in hand; EDGE is the edge in
+   hand; both hold the item, the index, the ring as it was (for Undo) and the
+   press. VTXHITS is rebuilt on every live paint, like DECKHITS, so a press can
+   ask what is under it without geometry. */
+let VTX=null, EDGE=null, VTXHITS=[], VTXTAP=null;
+/* the item opened for reshaping by a double-click (25b); null means every
+   reshapable item shows its handles, as it did before */
+let VTXOPEN=null;
+const VTX_R=9;                    // px: the handle, and the reach of a press on it
+const VTX_EDGE=7;                 // px: how near an edge a press must be
+const VTX_SNAP=0.10;              // m: snap reach (25h: ten centimetres, at George's word)
+const ANG_LABEL_MIN=0.8;          // m: no angle label where a side is shorter -- the tape wins
+const VTX_TAP_MS=380, VTX_TAP_PX=14;
+const VTX_WELD=0.30;              // m: drop a corner this near another and they become one
+const ANG_SNAP=3;                 // degrees either side of square that snaps to it
+const FLAT_ANG=2;                 // degrees either side of 180 that counts as flat (25c)
+/* ================== BUILDING MODE (22y) ==============================
+   A third mode beside Plot and Roof. The plan machinery it drives -- upload,
+   trace, scale, turn, drag -- is the ghost's, unchanged; what is new is the
+   step the ghost never had: PLACE, which turns the traced outline into a
+   building in AREAS like any MasterMap one, and REMOVE, which takes one off.
+   AREAS is what the session saves, so both persist, and a snapshot taken
+   before each is what Undo puts back. BLDTOOL is the one tap-tool the mode has ('remove' or nothing).
+   Declared here with the rest of the tool state, for the reason DECKSIDE is. */
+let BLDTOOL=null;
+/* the split in hand (23a): the two ends of the line being dragged across a
+   building, like LINECUT is for a plot. Its own state, so the plot's cut and
+   the building's cannot answer each other's release. */
+let BLDCUT=null;
+/* the corners tapped so far for a cut with bends (24b); the Split button
+   commits them, as the plot line's Form does */
+let BLDPTS=[];
+const BLD_WALL=0.3;       // metres a side, internal to external: a brick-and-cavity wall
+const BLD_MIN_PCT=10;     // the Size slider runs 0-200 as asked; below this a building is nothing
+const DECK_SQUARE=0.06;   // |cos| between adjacent sides: about 3.4 degrees
+const DECK_MIN=0.5;       // metres of deck that must survive; the deck drag's own floor
 /* AN OUTLINE CORNER PUT IN THE WRONG PLACE. Ridge junctions have always been
    draggable; the outline they sit inside was fixed the moment it closed, so a
    corner clicked two metres out meant redrawing the whole shape. It is armed
@@ -10072,6 +10233,34 @@ function rulerLabel(m){
      with six decimals on it reads as false precision. */
   return m<0.1 ? Math.round(m*1000)+' mm' : m.toFixed(2)+' m';
 }
+/* THE REPEATER (22x).
+
+   A measurement is dragged with a thumb, and the far end of it ends up under
+   that thumb -- so the one thing you need to see while you set a length
+   against a wall is the one thing the hand is covering. The answer is the
+   loupe every touch keyboard uses: a bubble ABOVE the finger showing what is
+   underneath it, magnified, with a crosshair on the exact point. The point
+   itself does not move; it is read from the copy.
+
+   Kept as a pure function of the point and the canvas so it can be gated on
+   numbers rather than on pixels: where the bubble goes is the part that has
+   rules, and the painting is just painting.
+
+   NO ROOM ABOVE means BELOW, not clipped -- a bubble half off the top of an
+   iPad is worse than no bubble. Below the thumb still clears it, because the
+   gap is measured from the point and a thumb is not 54 px of reach in every
+   direction at once. Clamped sideways for the same reason. */
+const LOUPE_SRC=26;          // CSS px of map sampled around the point
+const LOUPE_MAG=2.2;         // how much bigger it is drawn
+const LOUPE_GAP=54;          // CSS px from the point to the near edge of the bubble
+function rulerLoupe(bx,by,W,H,k){
+  const rs=LOUPE_SRC*k, rd=rs*LOUPE_MAG, gap=LOUPE_GAP*k, edge=3*k;
+  let cy=by-gap-rd, flip=false;
+  if(cy-rd<edge){ cy=by+gap+rd; flip=true; }
+  let cx=bx;
+  if(W>2*(rd+edge)) cx=Math.max(rd+edge,Math.min(W-rd-edge,bx));
+  return {cx:cx,cy:cy,rs:rs,rd:rd,flip:flip};
+}
 /* Which gesture the armed tool uses: 'rect' drags a box, 'brush' paints a run.
    Held apart from PLOTMODE because the TYPE and the GESTURE are separate
    choices — the two halves of one button. */
@@ -10105,6 +10294,7 @@ const MASKGREY='#a6ada9';    // the paint you see while working
 /* Thinner than the working line and stronger in colour: at 0.5 px it needs the
    density to hold together on paper, where a faint hairline breaks up. */
 const C_ROOF_PAPER='rgba(11,138,62,0.82)';
+const C_ROOF2_PAPER='rgba(92,178,122,0.75)';   // an extension's outline, on paper (24b)
 const C_ROOF='#0b8a3e', C_ROOF2='#5cb27a', C_RIDGE='#c42814', C_HIP='#1a63c4',
       C_NODE='#2a2a28', C_CASE='#1c1c1a';
 /* THE RIDGE LINE'S COLOUR IS A DRAWING CHOICE, NOT A MATERIAL ONE.
@@ -10145,7 +10335,55 @@ const ZMIN=0.5, ZMAX=12;
    direction house -> road must point down the screen. Screen-down is map -y,
    i.e. bearing 180. Rotating the scene by ROT about the anchor achieves it.   */
 
-function centroidOf(ring){
+/* NEEDS A CLOSED RING. It walks i < length-1, so on an UNCLOSED ring the last
+   edge is missing: the signed area comes out as nonsense and the centroid
+   lands far off the map. That is exactly how George's decking lost its turn
+   arrow -- the item is stored with an unclosed ring, the arrow was drawn, and
+   it was drawn at (6643192,-4985846). Closed here rather than at every call
+   site, so no future caller can trip on it (24s). */
+/* THE MIDDLE OF A SHAPE MADE OF MANY RINGS (24t). The area-weighted centroid
+   of the lot; and if that falls outside the shape -- an L, a horseshoe, or a
+   brush run that curls -- a coarse scan of the bounding box returns the
+   sample furthest from any edge instead, so the answer is always ON the
+   shape. Used to place the decking turn arrow, which was landing on the
+   biggest single sliver and so off to one side. */
+function ringsMiddle(rs){
+  const rings=(rs||[]).filter(r=>r&&r.length>=3);
+  if(!rings.length) return null;
+  let A=0, cx=0, cy=0;
+  for(const r of rings){
+    const a=ringArea(r.concat([r[0]]));
+    const c=centroidOf(r);
+    if(!c||!isFinite(a)) continue;
+    A+=Math.abs(a); cx+=c[0]*Math.abs(a); cy+=c[1]*Math.abs(a);
+  }
+  const inAny=p=>{ let n=0; for(const r of rings) if(pip(p,r.concat([r[0]]))) n++; return n%2===1; };
+  if(A>0){
+    const p=[cx/A,cy/A];
+    if(inAny(p)) return p;
+  }
+  /* outside: scan for the sample furthest inside */
+  let lo=[Infinity,Infinity], hi=[-Infinity,-Infinity];
+  rings.forEach(r=>r.forEach(q=>{
+    if(q[0]<lo[0]) lo[0]=q[0]; if(q[1]<lo[1]) lo[1]=q[1];
+    if(q[0]>hi[0]) hi[0]=q[0]; if(q[1]>hi[1]) hi[1]=q[1];
+  }));
+  const N=24, best={d:-1,p:null};
+  const edgeDist=p=>{ let d=Infinity;
+    for(const r of rings){ const t=nearRing(p,r.concat([r[0]])); if(t<d) d=t; }
+    return d; };
+  for(let i=0;i<=N;i++) for(let j=0;j<=N;j++){
+    const p=[lo[0]+(hi[0]-lo[0])*i/N, lo[1]+(hi[1]-lo[1])*j/N];
+    if(!inAny(p)) continue;
+    const d=edgeDist(p);
+    if(d>best.d){ best.d=d; best.p=p; }
+  }
+  return best.p||centroidOf(rings[0]);
+}
+function centroidOf(ring0){
+  const ring=(ring0&&ring0.length>2
+    &&(ring0[0][0]!==ring0[ring0.length-1][0]||ring0[0][1]!==ring0[ring0.length-1][1]))
+    ? ring0.concat([ring0[0]]) : ring0;
   let A=0,cx=0,cy=0;
   for(let i=0;i<ring.length-1;i++){
     const[x1,y1]=ring[i],[x2,y2]=ring[i+1],c=x1*y2-x2*y1;
@@ -11108,6 +11346,309 @@ function turnAllDecking(on){
   for(const it of PLOTITEMS) if(it&&it.type==='deck'){ it.turn=!!on; n++; }
   return n;
 }
+/* =================== TEXTURE (24g) ==================================
+   Every pattern is a function of a CELL of the plot's own grid, so it is the
+   same on screen, on paper and after a pan -- and two pieces of one kind laid
+   against each other continue the pattern instead of restarting it. All of it
+   is matte: flat colour at low alpha, no gradient anywhere.
+
+   TEX_* are the knobs George will want to turn. Density is per square metre;
+   alphas are how far the mark moves off the base colour. */
+/* EVERY SIZE HERE IS IN METRES ON THE GROUND (24i), and nothing in a pattern
+   depends on k or on the scale. That is what makes the export match the
+   screen: the marks are the same marks on the same ground, so they take up
+   the same part of a drive whatever it is drawn at. 24h put these in drawn
+   pixels and the export -- which renders at k=2 -- doubled every one of them.
+   The one thing that is NOT in metres is a stroke's width, which has to be in
+   pixels because that is what a stroke is; it is taken as a fraction of the
+   mark's own length so it scales with it. */
+const TEX_FLECK_GAP=0.20;       // path: metres between flecks
+const TEX_FLECK_LEN=0.10;       // metres, the long axis of a fleck
+const TEX_FLECK_DARK=0.30;      // alpha of the dark flecks
+const TEX_FLECK_LIGHT=0.34;     // alpha of the pale ones
+const TEX_SLAB_MIN=0.45;        // patio: the smallest slab, metres
+const TEX_SLAB_MAX=1.10;        // and the largest
+const TEX_SLAB_LINE=0.45;       // alpha of a slab's outline (24k: stronger on the darker patio)
+/* LINEWORK WEIGHT (24k). k scales geometry up so an export holds fine detail;
+   a BORDER scaled by k, though, comes out k times heavier than on screen -- a
+   4 px line becomes 10 on a k~2.58 sheet, which is what made every border
+   thick on the export. lineKw grows far more slowly than k, so an exported
+   line sits at nearly its screen weight while staying crisp. On screen (k=1)
+   it is exactly 1. Any painter can call it from the k it was handed. */
+function lineKw(k){ return 1+((k||1)-1)*0.18; }
+const TEX_DRIVE_FLECK=0.35;     // the drive is flecked, but a third as much as a path
+const TEX_TRI=0.26;             // hedge: metres across one leaf-triangle
+const TEX_TRI_A=0.16;           // and how far it moves off the green
+const TEX_WASH=10.4;            // grass: metres across one soft patch (24l: 4x, at George's word)
+const PLOT_BIG=250;             // m2: over this the garden circles double (24t)
+const TEX_WASH_BIG=2;           // how much bigger they go
+const TEX_WASH_A=0.030;         // and how far it moves off the green
+/* this render's pixels per metre, from the mapping it was handed */
+function texScale(X,Y){
+  return Math.hypot(X(1,0)-X(0,0),Y(1,0)-Y(0,0))||1;
+}
+/* kept, and now the identity it always should have been: a size on the
+   ground is a size on the ground. The signature stays so every caller reads
+   the same, and the gate that holds scale-invariance has one place to look. */
+function texCell(m,k,S){ return Math.max(1e-4,m); }
+/* a stable number in 0..1 for a cell of the plot grid */
+function texHash(i,j,salt){
+  let h=(i*374761393+j*668265263+(salt|0)*2246822519)>>>0;
+  h=(h^(h>>>13))>>>0; h=Math.imul(h,1274126177)>>>0;
+  return ((h^(h>>>16))>>>0)/4294967296;
+}
+/* WHAT IS ACTUALLY ON THE CANVAS, in plot metres (24u). A pattern that walks
+   its shape's whole bounding box pays for geometry nobody can see -- and with
+   a stray item stranded kilometres away it hits its own cell ceiling and
+   draws NOTHING. Intersecting the cell range with this makes off-screen
+   geometry free and puts the ceiling out of reach in ordinary work. */
+function texWindow(X,Y,g){
+  const W=(g&&g.canvas&&g.canvas.width)||0, H=(g&&g.canvas&&g.canvas.height)||0;
+  if(!(W>0&&H>0)) return null;
+  const S=texScale(X,Y);
+  if(!(S>1e-9)) return null;
+  /* invert by sampling: the mapping is a rotation and a scale, so two probes
+     give the frame without needing its internals */
+  const o=[X(0,0),Y(0,0)], ex=[X(1,0)-o[0],Y(1,0)-o[1]], ey=[X(0,1)-o[0],Y(0,1)-o[1]];
+  const det=ex[0]*ey[1]-ey[0]*ex[1];
+  if(Math.abs(det)<1e-12) return null;
+  const corners=[[0,0],[W,0],[W,H],[0,H]].map(p=>{
+    const dx=p[0]-o[0], dy=p[1]-o[1];
+    return [(dx*ey[1]-ey[0]*dy)/det, (ex[0]*dy-dx*ex[1])/det];
+  });
+  let lo=[Infinity,Infinity], hi=[-Infinity,-Infinity];
+  corners.forEach(q=>{
+    if(q[0]<lo[0]) lo[0]=q[0]; if(q[1]<lo[1]) lo[1]=q[1];
+    if(q[0]>hi[0]) hi[0]=q[0]; if(q[1]>hi[1]) hi[1]=q[1];
+  });
+  const pad=2/S;                                  // a couple of pixels of margin
+  return {lo:[lo[0]-pad,lo[1]-pad],hi:[hi[0]+pad,hi[1]+pad]};
+}
+/* the shape's bounds, narrowed to the window; null when nothing is in view */
+function texClip(rings,X,Y,g){
+  const b=texBounds(rings);
+  if(!b) return null;
+  const win=texWindow(X,Y,g);
+  if(!win) return b;
+  const lo=[Math.max(b.lo[0],win.lo[0]),Math.max(b.lo[1],win.lo[1])];
+  const hi=[Math.min(b.hi[0],win.hi[0]),Math.min(b.hi[1],win.hi[1])];
+  if(hi[0]<lo[0]||hi[1]<lo[1]) return null;       // off screen entirely
+  return {lo:lo,hi:hi};
+}
+function texBounds(rings){
+  let lo=[1e9,1e9], hi=[-1e9,-1e9];
+  rings.forEach(r=>r.forEach(q=>{
+    lo[0]=Math.min(lo[0],q[0]); lo[1]=Math.min(lo[1],q[1]);
+    hi[0]=Math.max(hi[0],q[0]); hi[1]=Math.max(hi[1],q[1]);
+  }));
+  return (hi[0]<lo[0])?null:{lo:lo,hi:hi};
+}
+/* AGGREGATE FLECKS, for a path. Short strokes at every angle, dark and pale
+   in equal measure, on a grid of cells one per fleck so the count is
+   predictable and the spread even without any of them lining up. */
+function drawFleck(g,rings,X,Y,k,dens){
+  const b=texClip(rings,X,Y,g); if(!b) return;
+  const S=texScale(X,Y);
+  const cell=texCell(TEX_FLECK_GAP,k,S)/Math.sqrt(dens==null?1:dens);
+  const flen=texCell(TEX_FLECK_LEN,k,S);
+  const i0=Math.floor(b.lo[0]/cell), i1=Math.ceil(b.hi[0]/cell);
+  const j0=Math.floor(b.lo[1]/cell), j1=Math.ceil(b.hi[1]/cell);
+  if((i1-i0)*(j1-j0)>90000) return;           // zoomed out past any use
+  g.save();
+  g.lineCap='round';
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+    const ox=texHash(i,j,1), oy=texHash(i,j,2), an=texHash(i,j,3), pick=texHash(i,j,4);
+    const x=(i+ox)*cell, y=(j+oy)*cell;
+    const a=an*Math.PI, L=flen*(0.6+0.8*texHash(i,j,5));
+    const x0=X(x-Math.cos(a)*L/2,y-Math.sin(a)*L/2), y0=Y(x-Math.cos(a)*L/2,y-Math.sin(a)*L/2);
+    const x1=X(x+Math.cos(a)*L/2,y+Math.sin(a)*L/2), y1=Y(x+Math.cos(a)*L/2,y+Math.sin(a)*L/2);
+    g.strokeStyle=(pick<0.5)?('rgba(90,92,88,'+TEX_FLECK_DARK+')')
+                            :('rgba(255,255,255,'+TEX_FLECK_LIGHT+')');
+    /* the width follows the length, or a fleck becomes a dot when the
+       drawing is small and a bar when it is large */
+    g.lineWidth=Math.max(0.5,L*S*0.42);
+    g.beginPath(); g.moveTo(x0,y0); g.lineTo(x1,y1); g.stroke();
+  }
+  g.restore();
+}
+/* PAVING, for a patio: squares and rectangles at random intervals, as in the
+   photograph George sent -- not a course of identical slabs. A coarse grid
+   decides where a slab STARTS, and each slab takes a random size from it, so
+   the sizes vary, the joints do not line up across the area, and the whole
+   thing is still stable under a redraw. Square to the plot, as the deck
+   boards are: paving laid on the map's axes would sit skew to the house. */
+function drawSlabs(g,rings,X,Y,k){
+  const ca=Math.cos(ROT), sa=Math.sin(ROT);
+  const ux=[ca,-sa], uy=[-sa,-ca];
+  const U=q=>q[0]*ux[0]+q[1]*ux[1], V=q=>q[0]*uy[0]+q[1]*uy[1];
+  const P=(u,v)=>[u*ux[0]+v*uy[0], u*ux[1]+v*uy[1]];
+  let lo=[1e9,1e9], hi=[-1e9,-1e9];
+  rings.forEach(r=>r.forEach(q=>{
+    const u=U(q), v=V(q);
+    lo[0]=Math.min(lo[0],u); lo[1]=Math.min(lo[1],v);
+    hi[0]=Math.max(hi[0],u); hi[1]=Math.max(hi[1],v);
+  }));
+  if(hi[0]<lo[0]) return;
+  /* narrowed to what is on the canvas, in the same rotated frame (24u) */
+  const win=texWindow(X,Y,g);
+  if(win){
+    const cs=[[win.lo[0],win.lo[1]],[win.hi[0],win.lo[1]],
+              [win.hi[0],win.hi[1]],[win.lo[0],win.hi[1]]];
+    let wl=[1e9,1e9], wh=[-1e9,-1e9];
+    cs.forEach(q=>{ const u=U(q), v=V(q);
+      wl[0]=Math.min(wl[0],u); wl[1]=Math.min(wl[1],v);
+      wh[0]=Math.max(wh[0],u); wh[1]=Math.max(wh[1],v); });
+    lo=[Math.max(lo[0],wl[0]),Math.max(lo[1],wl[1])];
+    hi=[Math.min(hi[0],wh[0]),Math.min(hi[1],wh[1])];
+    if(hi[0]<lo[0]||hi[1]<lo[1]) return;
+  }
+  const S=texScale(X,Y);
+  const slabMin=texCell(TEX_SLAB_MIN,k,S), slabMax=texCell(TEX_SLAB_MAX,k,S);
+  const cell=slabMax;
+  const i0=Math.floor(lo[0]/cell)-1, i1=Math.ceil(hi[0]/cell)+1;
+  const j0=Math.floor(lo[1]/cell)-1, j1=Math.ceil(hi[1]/cell)+1;
+  if((i1-i0)*(j1-j0)>40000) return;
+  g.save();
+  g.lineJoin='miter';
+  g.lineWidth=Math.max(0.6,1.0*k);
+  g.strokeStyle='rgba(255,255,255,'+TEX_SLAB_LINE+')';
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+    const span=slabMax-slabMin;
+    const w=slabMin+span*texHash(i,j,11);
+    const h=slabMin+span*texHash(i,j,12);
+    const x=i*cell+(cell-w)*texHash(i,j,13);
+    const y=j*cell+(cell-h)*texHash(i,j,14);
+    const c=[P(x,y),P(x+w,y),P(x+w,y+h),P(x,y+h)];
+    g.beginPath();
+    c.forEach((q,n)=>n?g.lineTo(X(q[0],q[1]),Y(q[0],q[1])):g.moveTo(X(q[0],q[1]),Y(q[0],q[1])));
+    g.closePath(); g.stroke();
+  }
+  g.restore();
+}
+/* MOTTLE, for the plot and the hedge: soft patches a couple of metres across,
+   each a shade off the base. Nothing is drawn darker or lighter than
+   TEX_MOTTLE, so it reads as variation in the ground rather than as shadow.
+   Squares, not circles: a gradient would not be matte. */
+/* THE HEDGE IS LEAVES (24h): triangles at random angles and sizes, a shade
+   either side of the green. Random in size and in how many, so no two stretches
+   of hedge read the same, and small enough that a hedge still reads as a solid
+   colour from across the sheet. */
+function drawLeaves(g,rings,X,Y,k){
+  const b=texClip(rings,X,Y,g); if(!b) return;
+  const S=texScale(X,Y);
+  const cell=texCell(TEX_TRI,k,S);
+  const i0=Math.floor(b.lo[0]/cell)-1, i1=Math.ceil(b.hi[0]/cell)+1;
+  const j0=Math.floor(b.lo[1]/cell)-1, j1=Math.ceil(b.hi[1]/cell)+1;
+  if((i1-i0)*(j1-j0)>60000) return;
+  g.save();
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+    if(texHash(i,j,31)>0.82) continue;            // gaps, so it is not a lattice
+    const cx=(i+texHash(i,j,32))*cell, cy=(j+texHash(i,j,33))*cell;
+    const R=cell*(0.35+0.65*texHash(i,j,34));
+    const a0=texHash(i,j,35)*Math.PI*2;
+    const up=texHash(i,j,36)<0.5;
+    const amt=TEX_TRI_A*(0.4+0.6*texHash(i,j,37));
+    g.fillStyle=(up?'rgba(255,255,255,':'rgba(12,32,12,')+amt.toFixed(3)+')';
+    g.beginPath();
+    for(let n=0;n<3;n++){
+      const a=a0+n*2.0944+texHash(i,j,38+n)*0.5;
+      const q=[cx+Math.cos(a)*R, cy+Math.sin(a)*R];
+      n?g.lineTo(X(q[0],q[1]),Y(q[0],q[1])):g.moveTo(X(q[0],q[1]),Y(q[0],q[1]));
+    }
+    g.closePath(); g.fill();
+  }
+  g.restore();
+}
+/* THE GRASS IS A WASH (24h): overlapping soft discs a shade either side of the
+   green, each so faint that where two meet there is no edge to see. Squares on
+   a grid read as a chequerboard, which is what George saw. */
+function drawWash(g,rings,X,Y,k){
+  /* the AREA is the shape's, so a big plot still gets big circles; only the
+     cells walked are narrowed to the window (24u) */
+  const b=texClip(rings,X,Y,g); if(!b) return;
+  const S=texScale(X,Y);
+  /* A BIG PLOT GETS BIGGER CIRCLES (24t). At 10.4 m they read as fine
+     mottling across a quarter-acre rather than as broad variation in the
+     ground; over PLOT_BIG they double. Measured on the rings being washed,
+     so it follows the plot itself and not the zoom. */
+  let area=0;
+  for(const r of rings) area+=Math.abs(ringArea(r.concat([r[0]])));
+  const grow=(area>PLOT_BIG)?TEX_WASH_BIG:1;
+  const cell=texCell(TEX_WASH*grow,k,S);
+  const i0=Math.floor(b.lo[0]/cell)-2, i1=Math.ceil(b.hi[0]/cell)+2;
+  const j0=Math.floor(b.lo[1]/cell)-2, j1=Math.ceil(b.hi[1]/cell)+2;
+  if((i1-i0)*(j1-j0)>20000) return;
+  g.save();
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+    for(let n=0;n<3;n++){                          // three passes, offset, so
+      const h1=texHash(i,j,41+n*7);                // the discs overlap heavily
+      if(h1>0.85) continue;
+      const cx=(i+texHash(i,j,42+n*7))*cell, cy=(j+texHash(i,j,43+n*7))*cell;
+      const R=cell*(0.55+0.7*texHash(i,j,44+n*7));
+      const up=texHash(i,j,45+n*7)<0.5;
+      const amt=TEX_WASH_A*(0.35+0.65*texHash(i,j,46+n*7));
+      g.fillStyle=(up?'rgba(255,255,255,':'rgba(30,48,24,')+amt.toFixed(3)+')';
+      g.beginPath(); g.arc(X(cx,cy),Y(cx,cy),Math.max(1,R*S),0,7); g.fill();
+    }
+  }
+  g.restore();
+}
+function drawMottle(g,rings,X,Y,k,dark){
+  const b=texClip(rings,X,Y,g); if(!b) return;
+  const cell=TEX_MOTTLE_M;
+  const i0=Math.floor(b.lo[0]/cell)-1, i1=Math.ceil(b.hi[0]/cell)+1;
+  const j0=Math.floor(b.lo[1]/cell)-1, j1=Math.ceil(b.hi[1]/cell)+1;
+  if((i1-i0)*(j1-j0)>40000) return;
+  g.save();
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+    const t=texHash(i,j,21);
+    if(t>0.72) continue;                       // some patches are the base itself
+    const up=texHash(i,j,22)<0.5;
+    const amt=TEX_MOTTLE*(0.45+0.55*texHash(i,j,23))*(dark?1.5:1);
+    const w=cell*(0.55+0.5*texHash(i,j,24)), h=cell*(0.55+0.5*texHash(i,j,25));
+    const x=i*cell+(cell-w)*texHash(i,j,26), y=j*cell+(cell-h)*texHash(i,j,27);
+    const c=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+    g.fillStyle=(up?'rgba(255,255,255,':'rgba(30,48,24,')+amt.toFixed(3)+')';
+    g.beginPath();
+    c.forEach((q,n)=>n?g.lineTo(X(q[0],q[1]),Y(q[0],q[1])):g.moveTo(X(q[0],q[1]),Y(q[0],q[1])));
+    g.closePath(); g.fill();
+  }
+  g.restore();
+}
+/* which texture a kind wears; nothing here knows about any other */
+function drawItemTexture(g,t,rings,X,Y,k){
+  if(t==='path') drawFleck(g,rings,X,Y,k);
+  else if(t==='patio') drawSlabs(g,rings,X,Y,k);
+  else if(t==='hedge') drawLeaves(g,rings,X,Y,k);
+  /* the drive is tarmac, not aggregate: the same marks, far fewer of them,
+     or a big drive reads as noise rather than as a surface */
+  else if(t==='drive') drawFleck(g,rings,X,Y,k,TEX_DRIVE_FLECK);
+}
+/* THE RECTANGLES OF A KIND, JOINED BY TOUCH (24o). Items that overlap or share
+   a wall fold into one ring through unionRings, pairwise, until nothing more
+   joins. Only single-ring items (dragged boxes) take part: a painted run is
+   already one shape and its slivers do not fold cleanly. Returns groups of
+   {items, ring} -- a box touching nothing is a group of one, ring its own. */
+function joinedRects(type){
+  const groups=[];
+  for(const it of PLOTITEMS){
+    if(!it||it.type!==type||!it.ring||it.ring.length<3) continue;
+    groups.push({items:[it],ring:uClean(it.ring)});
+  }
+  let merged=true, guard=0;
+  while(merged&&guard++<400){
+    merged=false;
+    outer:
+    for(let a=0;a<groups.length;a++) for(let b=a+1;b<groups.length;b++){
+      const u=unionRings(groups[a].ring,groups[b].ring);
+      if(u&&u.parts===1&&u.ring&&u.ring.length>=3&&(u.overlap>0.01||u.shared>0.01)){
+        groups[a]={items:groups[a].items.concat(groups[b].items),ring:uClean(u.ring)};
+        groups.splice(b,1); merged=true; break outer;
+      }
+    }
+  }
+  return groups;
+}
 function drawDeckGrain(g,rings,X,Y,k,turned){
   if(!rings||!rings.length) return;
   let lo=[1e9,1e9], hi=[-1e9,-1e9];
@@ -11451,6 +11992,38 @@ function drawAccessPreview(g,X,Y,k){
   }
   g.restore();
 }
+/* IS THIS LINE THE PLOT'S OWN BOUNDARY? (24q) Most of a part's points within
+   LINE_ON_PLOT of the selected plot's rings. Used to hold such a line back
+   from the item punch: the plot's edge is not something a drive laid to it
+   may cut, whichever feature happens to carry it. */
+const LINE_ON_PLOT=0.35;
+function nearRing(p,r){
+  let best=Infinity;
+  for(let i=0;i<r.length-1;i++){
+    const a=r[i], b=r[i+1];
+    const dx=b[0]-a[0], dy=b[1]-a[1], L2=dx*dx+dy*dy;
+    if(L2<1e-12) continue;
+    let u=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L2;
+    u=u<0?0:(u>1?1:u);
+    const d=Math.hypot(p[0]-(a[0]+u*dx),p[1]-(a[1]+u*dy));
+    if(d<best) best=d;
+  }
+  return best;
+}
+function lineOnPlotBoundary(f,clip){
+  if(!clip||!clip.length) return false;
+  for(const part of lineParts(f.geometry)){
+    if(!part||part.length<2) continue;
+    let on=0;
+    for(const p of part){
+      let d=Infinity;
+      for(const r of clip){ const t=nearRing(p,r.concat([r[0]])); if(t<d) d=t; }
+      if(d<=LINE_ON_PLOT) on++;
+    }
+    if(on>=Math.max(2,Math.ceil(part.length/2))) return true;
+  }
+  return false;
+}
 function plotClipRings(){
   const out=[];
   for(const i of selAll()){
@@ -11478,6 +12051,9 @@ function plotClipRings(){
    So the item is stored whole and drawn cut. Nothing is destroyed by dragging
    a box too far, which matters because the highlight can change afterwards. */
 function paintPlotItems(g,X,Y,k,live){
+  /* the arrows are rebuilt on every live paint (24o) -- resetting only inside
+     the deck branch left the last deck's arrow pressable after it was gone */
+  if(live){ DECKHITS.length=0; VTXHITS.length=0; }
   /* THE PREVIEWS COUNT AS SOMETHING TO PAINT (21f). This early-out listed
      the item gestures only, so on a plot with NOTHING laid yet the plot
      line's box and the eraser's box or rub drew nothing at all -- the
@@ -11490,7 +12066,7 @@ function paintPlotItems(g,X,Y,k,live){
              drive:css('--drive')||'#6b6f72',
              path:css('--path')||'#c6c9c6',
              deck:css('--deck')||'#9a7649',
-             patio:css('--patio')||'#b9b2a6'};
+             patio:css('--patio')||'#e4e1d6'};
   g.save();
   g.beginPath();
   for(const r of clip){
@@ -11511,16 +12087,19 @@ function paintPlotItems(g,X,Y,k,live){
      exactly the outline of the union. No boolean geometry, and it costs one
      extra pass per type rather than per item. Types stay separate, so a path
      crossing a drive still shows where one ends. */
-  const byType={};
-  for(const it of PLOTITEMS){
-    /* a dragged rectangle is one ring; a painted run is a set of convex
-       pieces whose union is the shape */
-    const rs=it.rings||(it.ring?[it.ring]:[]);
-    /* wound the same way before they go in the path, so a second item laid
-       over the first ADDS to it instead of cancelling it */
-    for(const r of rs) if(r&&r.length>=3)
-      (byType[it.type]=byType[it.type]||[]).push(sameWinding(r));
-  }
+  /* a dragged rectangle is one ring; a painted run is a set of convex pieces
+     whose union is the shape. Wound the same way before they go in the path,
+     so a second item laid over the first ADDS to it instead of cancelling. */
+  const byType=run=>{                       // one run's rings, merged as a group
+    const out=[];
+    for(const it of run.items){
+      const rs=it.rings||(it.ring?[it.ring]:[]);
+      for(const r of rs) if(r&&r.length>=3) out.push(sameWinding(r));
+    }
+    return out;
+  };
+  /* the type order is still a fact about the drawing, and the key reads it */
+  void plotPaintOrder(PLOTITEMS);
   /* WHAT WAS DRAWN LAST LIES ON TOP.
      The order used to be fixed -- drive, path, patio, deck, hedge -- so a
      path laid across a patio went UNDER it and could not be seen at all;
@@ -11529,9 +12108,11 @@ function paintPlotItems(g,X,Y,k,live){
      into one mass; it is the ORDER of the groups that now follows the work,
      each type taking the place of its most recent item. Nothing drawn is
      hidden by something older than it. */
-  for(const t of plotPaintOrder(PLOTITEMS)){
-    const group=byType[t];
-    if(!group||!group.length) continue;
+  const RUNS=plotPaintRuns(PLOTITEMS), lastRun={};
+  RUNS.forEach(r=>{ lastRun[r.t]=r; });
+  for(const run of RUNS){
+    const t=run.t, group=byType(run);
+    if(!group.length) continue;
     g.beginPath();
     group.forEach(r=>{
       r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
@@ -11550,9 +12131,47 @@ function paintPlotItems(g,X,Y,k,live){
        nothing over the border. */
     g.save();
     g.clip();
-    g.strokeStyle='rgba(40,42,40,0.35)'; g.lineWidth=4*k; g.stroke();
+    /* NO BORDER ROUND THE PIECE (24h). Stroking each run drew a line round
+       every add-on inside the shape; the kind is outlined once, below, after
+       its last run. */
     g.fillStyle=COL[t]||COL.path; g.fill();
+    /* THE TEXTURE, INSIDE THE SHAPE (24g). Clipped to the run that has just
+       been filled, so it stops at the edge exactly as the fill does. */
+    drawItemTexture(g,t,group,X,Y,k);
     g.restore();
+    /* AND THE OUTLINE, ONCE, AFTER THIS KIND'S LAST RUN (24h), BY STROKING
+       FIRST AND FILLING OVER IT (24m).
+
+       24h stroked every ring of the kind clipped to the kind. The clip cuts
+       off the half of the line lying outside the shape -- but the edge
+       BETWEEN two touching pieces is INSIDE it, so the clip kept all of that
+       edge, and every internal join was drawn at full strength. That is the
+       border-per-piece George photographed; clipping could never dissolve it.
+
+       Stroke the whole kind, then fill the whole kind on top. An internal
+       edge is inside the filled region by definition, so the fill buries it;
+       the only line that survives is the outer half of the true boundary.
+       One border round the whole shape, nothing inside it, and no polygon
+       union to get wrong. The texture is re-laid over the fill, since the
+       fill has just covered the run's own. */
+    if(lastRun[t]===run){
+      const all=[];
+      for(const it of PLOTITEMS){
+        if(!it||it.type!==t) continue;
+        const rs=it.rings||(it.ring?[it.ring]:[]);
+        for(const r of rs) if(r&&r.length>=3) all.push(sameWinding(r));
+      }
+      g.beginPath();
+      all.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                         :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+      /* SCREEN WEIGHT ON PAPER (24k): lineKw(k) not k. Double width, because
+         the fill takes the inner half back off. */
+      g.strokeStyle='rgba(40,42,40,0.35)'; g.lineWidth=4*lineKw(k); g.stroke();
+      g.save(); g.clip();
+      g.fillStyle=COL[t]||COL.path; g.fill();
+      drawItemTexture(g,t,all,X,Y,k);
+      g.restore();
+    }
     /* DECKING GETS ITS BOARDS. Drawn inside the shape it has just filled,
        clipped to it, so a run painted with the brush is boarded to its own
        outline rather than to a bounding box. */
@@ -11585,23 +12204,99 @@ function paintPlotItems(g,X,Y,k,live){
          area on screen; pressing it turns THAT area's boards. */
       if(live){
         DECKHITS.length=0;
+        /* ONE ARROW PER JOINED DECK (24o): boxes that touch are one deck and
+           get one arrow at the union's centroid, which turns them together.
+           Painted runs are not boxes and keep an arrow each. */
+        const seen=new Set();
+        const targets=[];
+        for(const gp of joinedRects('deck')){
+          gp.items.forEach(it=>seen.add(it));
+          targets.push({items:gp.items,ring:gp.ring});
+        }
         for(const it of PLOTITEMS){
-          if(!it||it.type!=='deck') continue;
-          const rs=it.rings||(it.ring?[it.ring]:[]);
-          let big=null, ba=0;
-          for(const r of rs){ const a=Math.abs(ringArea([...r,r[0]])); if(a>ba){ ba=a; big=r; } }
-          if(!big||ba<0.5) continue;
-          const c=centroidOf(big);
-          const cx=X(c[0],c[1]), cy=Y(c[0],c[1]), R=9*k;
+          if(!it||it.type!=='deck'||seen.has(it)) continue;
+          const rs=it.rings||[];
+          /* EVERY ring of the deck, not the biggest one (24t) */
+          if(rs.length) targets.push({items:[it],rings:rs,ring:rs[0]});
+        }
+        for(const tg of targets){
+          const all=tg.rings||[tg.ring];
+          const it=tg.items[0];
+          let ba=0; for(const r of all) ba+=Math.abs(ringArea([...r,r[0]]));
+          if(!all.length||ba<0.5) continue;
+          const c=ringsMiddle(all);
+          if(!c) continue;
+          /* BIG ENOUGH TO FIND AND TO HIT (24e). At 9 px of pale paper with a
+             grey hairline it sat invisible on a boarded deck -- George could
+             not see it at all. 14 px, the ruler's own rust, and a white
+             casing: instrument, not chrome. It is also the touch target. */
+          const cx=X(c[0],c[1]), cy=Y(c[0],c[1]), R=14*k;
           g.beginPath(); g.arc(cx,cy,R,0,7);
-          g.fillStyle='rgba(253,252,249,0.9)'; g.fill();
-          g.strokeStyle='rgba(40,42,40,0.6)'; g.lineWidth=1*k; g.stroke();
-          g.fillStyle='#1c1c1a';
-          g.font=(11*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+          g.fillStyle='rgba(253,252,249,0.96)'; g.fill();
+          g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=3*k; g.stroke();
+          g.strokeStyle='#b0421a'; g.lineWidth=1.6*k; g.stroke();
+          g.fillStyle='#b0421a';
+          g.font='600 '+(15*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
           g.textAlign='center'; g.textBaseline='middle';
           g.fillText('\u21bb',cx,cy+0.5*k);
-          DECKHITS.push({it:it,x:cx-R,y:cy-R,w:2*R,h:2*R});
+          DECKHITS.push({it:it,items:tg.items,x:cx-R,y:cy-R,w:2*R,h:2*R});
         }
+      }
+    }
+    /* THE CORNER HANDLES (24z), for every item that can be reshaped, live
+       only, drawn after the kind so they sit on top. A corner in hand is
+       filled; the rest are rings. Registered in VTXHITS so a press can find
+       them without geometry. */
+    if(live&&run===RUNS[RUNS.length-1]){
+      for(const it of vtxItems()){
+        /* one item opened by a double-click shows its handles alone (25b);
+           with nothing opened they all show, as they did before */
+        if(VTXOPEN&&it!==VTXOPEN) continue;
+        it.ring.forEach((q,i)=>{
+          const x=X(q[0],q[1]), y=Y(q[0],q[1]);
+          /* NO HANDLE ON A CORNER IN HAND (25e). The line being dragged should
+             read as a line, not a line with dots on it -- and it must go from
+             VTXHITS too, or a press would still find a handle that is not
+             drawn. */
+          const g2=(VTX&&VTX.it===it)?VTX:((EDGE&&EDGE.it===it)?EDGE:null);
+          if(g2&&g2.live&&g2.live.some(p=>Math.hypot(p[0]-q[0],p[1]-q[1])<1e-9)) return;
+          VTXHITS.push({it:it,i:i,x:x,y:y});
+          /* THE INTERIOR ANGLE (25a), set just inside the corner along the
+             bisector so it never sits on the handle */
+          const ang=vtxAngle(it.ring,i);
+          /* THE TAPE WINS WHERE THEY CROWD (25h): no angle on a corner where
+             either side is shorter than ANG_LABEL_MIN, since the measurement
+             lands on the same spot and it is the one George reads. */
+          const nL=it.ring.length;
+          const pPrev=it.ring[(i-1+nL)%nL], pNext=it.ring[(i+1)%nL];
+          const sPrev=Math.hypot(q[0]-pPrev[0],q[1]-pPrev[1]);
+          const sNext=Math.hypot(q[0]-pNext[0],q[1]-pNext[1]);
+          const crowded=Math.min(sPrev,sNext)<ANG_LABEL_MIN;
+          if(ang!=null&&!crowded){
+            const n2=it.ring.length;
+            const pa=it.ring[(i-1+n2)%n2], pb=it.ring[(i+1)%n2];
+            const ax2=X(pa[0],pa[1])-x, ay2=Y(pa[0],pa[1])-y;
+            const bx2=X(pb[0],pb[1])-x, by2=Y(pb[0],pb[1])-y;
+            const la2=Math.hypot(ax2,ay2)||1, lb2=Math.hypot(bx2,by2)||1;
+            let ux2=ax2/la2+bx2/lb2, uy2=ay2/la2+by2/lb2;
+            const lu=Math.hypot(ux2,uy2);
+            if(lu>1e-6){ ux2/=lu; uy2/=lu; } else { ux2=0; uy2=-1; }
+            g.save();
+            g.font='600 '+(10*k)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+            g.textAlign='center'; g.textBaseline='middle';
+            const tx=x+ux2*16*k, ty=y+uy2*16*k, txt=Math.round(ang)+'\u00b0';
+            g.lineWidth=3*k; g.strokeStyle='rgba(255,255,255,0.9)';
+            g.strokeText(txt,tx,ty);
+            g.fillStyle='rgb(176,66,26)'; g.fillText(txt,tx,ty);
+            g.restore();
+          }
+          const inHand=VTX&&VTX.it===it&&VTX.i===i;
+          g.beginPath(); g.arc(x,y,(inHand?5.5:4)*k,0,7);
+          /* rgb(), not #hex: the fill counters take every #-colour fill for an
+             item's, and a handle is not an item */
+          g.fillStyle=inHand?'rgb(176,66,26)':'rgb(255,255,255)'; g.fill();
+          g.lineWidth=1.6*k; g.strokeStyle='rgb(176,66,26)'; g.stroke();
+        });
       }
     }
     /* THE PATIO IS ITS COLOUR AND NOTHING ELSE. It was slabbed on George's
@@ -11712,12 +12407,24 @@ function paintPlotItems(g,X,Y,k,live){
      the live pass only, so the plan is annotated while it is being made and
      the sheet stays clean. */
   if(live&&PLOTITEMS.length){
-    for(const it of PLOTITEMS){
-      if(!it||!it.ring||it.ring.length!==4) continue;
-      const r=it.ring;
-      const w=Math.hypot(r[1][0]-r[0][0],r[1][1]-r[0][1]);
-      const h=Math.hypot(r[3][0]-r[0][0],r[3][1]-r[0][1]);
-      if(w<0.3||h<0.3) continue;
+    /* ONE FIGURE PER STRAIGHT EDGE OF THE JOINED SHAPE (24o). Each box used
+       to carry its own two figures, so a path of squares was captioned
+       square by square. The boxes of a kind are joined by touch and the
+       joined outline's edges are labelled -- three squares in a row read as
+       one edge, one figure. */
+    const kinds=['drive','path','patio','deck','hedge'];
+    const edges=[];
+    for(const t of kinds){
+      for(const gp of joinedRects(t)){
+        const r=gp.ring;
+        for(let i=0;i<r.length;i++){
+          const a=r[i], b=r[(i+1)%r.length];
+          const L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+          if(L>=0.3) edges.push([a,b,L]);
+        }
+      }
+    }
+    for(const [a,b,L] of edges){
       const lab=(q1,q2,txt)=>{
         const lx=(X(q1[0],q1[1])+X(q2[0],q2[1]))/2;
         const ly=(Y(q1[0],q1[1])+Y(q2[0],q2[1]))/2;
@@ -11730,8 +12437,7 @@ function paintPlotItems(g,X,Y,k,live){
         g.fillStyle='rgba(24,64,44,0.9)';
         g.fillText(txt,lx,ly);
       };
-      lab(r[0],r[1],w.toFixed(2)+' m');
-      lab(r[0],r[3],h.toFixed(2)+' m');
+      lab(a,b,L.toFixed(2)+' m');
     }
   }
   if(live&&PLOTPLACE){                            // the box being dragged out
@@ -11800,7 +12506,10 @@ function paintPlotItems(g,X,Y,k,live){
    Answered as rings in MAP METRES rather than painted, so the geometry can be
    measured without a canvas -- the suite's canvas is a stub, and a shadow
    that could only be judged in pixels could not be gated at all. */
-const SHADOW={on:false};                   // off by default: no issued drawing changes
+/* TWO SWITCHES (24s). `on` is the ROOFS, and keeps its name and its meaning so
+   every gate and every saved session still reads true. `items` is the kerb
+   shadow the plot items throw, and George wants it TICKED by default. */
+const SHADOW={on:false,items:true};
 /* THE PARAPET. A raised edge round a flat roof: 450 mm high, a 220 mm coping
    seen in plan. Named constants with their own gate, the export-brush lesson.
    Per roof it is one boolean, R.parapet -- the sizes are a survey convention,
@@ -11901,7 +12610,13 @@ function parapetShadeQuads(R,sunv,others){
 /* its own named constant and its own gate: a default nobody measures is how
    the export brush once shipped switched off */
 const SHADOW_RGBA='rgba(12,16,20,0.26)';
-const SHADOW_STEP_MIN=0.12, SHADOW_STEP_MAX=0.45;    // metres between samples
+/* THE STRIP WIDTH IS THE JAG (24r). groundShadow walks the roof in strips
+   along the sun; each strip's shadow ends where that strip's tallest point
+   throws, so the sawtooth George asked about is one strip wide. shadowStep
+   aims at 2-3 drawn pixels, but the 0.12 m floor meant that past ~25 px/m the
+   strips stopped getting finer and got wider ON SCREEN -- 9.6 px at 80 px/m.
+   0.03 m holds the aim out to about 100 px/m. */
+const SHADOW_STEP_MIN=0.03, SHADOW_STEP_MAX=0.45;    // metres between samples
 function shadowStep(mpx,live){
   const px=live?3:2;                       // finer on paper than on the screen
   /* QUANTISED TO 50 mm so the cache survives a zoom. Without it the step
@@ -12004,6 +12719,186 @@ function groundShadow(R,sunv,step){
    silhouette, not a stack of fills that darken where they cross. The scale
    comes from the mapping this render was HANDED -- one metre through X -- not
    from the screen's, which is the trap the ghost fell into. */
+/* A KERB ON EVERY PLOT ITEM (24r). George: give the borders a slight height
+   and let them throw, like the roofs, onto the green. KERB_H is thrown along
+   the same sun as the roofs, so the sheet is lit from one place.
+
+   The shadow is a quadrilateral off each edge of a kind's JOINED outline --
+   the outline its border is drawn on -- so the kerb belongs to the shape and
+   not to the pieces it was built from. Every kind's quads go in one path and
+   are filled once: overlapping quads at a corner would otherwise double the
+   tone and read as a dark blot. */
+const KERB_H=0.10;                                   // metres proud of the ground
+const KERB_RGBA='rgba(12,16,20,0.18)';
+/* A HEDGE IS A METRE HIGH AND FULL OF HOLES (24v). Ten times the kerb's
+   throw, but not a solid bar of shade: the light comes through in patches, so
+   the sweep is broken into a scatter seeded off the plot grid -- stable under
+   a redraw and a pan, like every other pattern here -- and laid fainter than
+   the kerb. Unlike the kerb it falls on the OTHER ITEMS too: a hedge shading
+   a patio is what happens on the ground. */
+const HEDGE_H=0.5;                                   // metres (24w: George's figure)
+/* WHICH DAPPLE (24w). 1 blocks, 2 teeth, 3 leaves -- denser in that order.
+   All seeded off the plot grid, all filled in one path.
+   George chose LEAVES from the three drawn for him (24x). */
+const HEDGE_STYLE=3;
+const HEDGE_RGBA='rgba(12,16,20,0.13)';
+const HEDGE_DAPPLE=0.17;                             // metres across one patch (24w: half)
+const HEDGE_GAP=0.28;                                // this share of patches is light through
+/* the throw of one hedge edge, broken into patches. `off` is the full sweep;
+   each patch is a short span of the edge carried part way along it. */
+function hedgeDapple(ring,off,style){
+  const mode=(style==null?HEDGE_STYLE:style);
+  const out=[];
+  const sweep=Math.hypot(off[0],off[1]);
+  if(!(sweep>1e-6)) return out;
+  /* EACH STYLE IS DENSER THAN THE ONE BEFORE (24w): a finer patch and fewer
+     gaps, so 1 -> 2 -> 3 is a real step up in density and not only in shape. */
+  const fine=(mode===3)?0.45:(mode===2)?0.7:1;
+  const cell=HEDGE_DAPPLE*fine;
+  const gap=HEDGE_GAP*((mode===3)?0.5:(mode===2)?0.75:1);
+  const steps=Math.max(2,Math.round(sweep/cell));
+  for(let i=0;i<ring.length;i++){
+    const a=ring[i], b=ring[(i+1)%ring.length];
+    const L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    if(L<0.05) continue;
+    const ex=(b[0]-a[0])/L, ey=(b[1]-a[1])/L;        // along the edge
+    const along=Math.max(1,Math.round(L/cell));
+    for(let u=0;u<along;u++){
+      const t0=u/along, t1=(u+1)/along;
+      const p0=[a[0]+(b[0]-a[0])*t0, a[1]+(b[1]-a[1])*t0];
+      const p1=[a[0]+(b[0]-a[0])*t1, a[1]+(b[1]-a[1])*t1];
+      const seg=L/along;
+      for(let v=0;v<steps;v++){
+        const gi=Math.round(p0[0]/cell)+v*31;
+        const gj=Math.round(p0[1]/cell)+i*17;
+        const key=texHash(gi,gj,91+v);
+        if(key<gap) continue;                        // light through
+        const s0=v/steps, s1=(v+1)/steps;
+        const q=(p,s)=>[p[0]+off[0]*s, p[1]+off[1]*s];
+        if(mode===2){
+          /* TEETH: a triangle either way up, its apex jittered along the edge
+             so the far rim of the shadow is a sawtooth, not a line */
+          const up=texHash(gi,gj,140)<0.5;
+          const jit=(texHash(gi,gj,141)-0.5)*seg*0.9;
+          const apex=[p0[0]+ex*(seg*0.5+jit), p0[1]+ey*(seg*0.5+jit)];
+          out.push(up
+            ? [q(p0,s0), q(p1,s0), q(apex,s1)]
+            : [q(apex,s0), q(p1,s1), q(p0,s1)]);
+        } else if(mode===3){
+          /* LEAVES: a small four-cornered leaf at a random angle, every
+             corner jittered -- the densest, and its outer edge speckles out */
+          const cx=p0[0]+ex*seg*(0.25+0.5*texHash(gi,gj,150));
+          const cy=p0[1]+ey*seg*(0.25+0.5*texHash(gi,gj,151));
+          const c=q([cx,cy],(s0+s1)/2);
+          const r0=seg*(0.45+0.5*texHash(gi,gj,152));
+          const a0=texHash(gi,gj,153)*Math.PI*2;
+          const leaf=[];
+          for(let n=0;n<4;n++){
+            const an=a0+n*Math.PI/2+(texHash(gi,gj,154+n)-0.5)*0.8;
+            const rr=r0*(0.55+0.9*texHash(gi,gj,158+n));
+            leaf.push([c[0]+Math.cos(an)*rr, c[1]+Math.sin(an)*rr]);
+          }
+          out.push(leaf);
+        } else {
+          /* BLOCKS: the plain patch, tightened */
+          out.push([q(p0,s0), q(p1,s0), q(p1,s1), q(p0,s1)]);
+        }
+      }
+    }
+  }
+  return out;
+}
+function kerbQuads(ring,off){
+  const out=[];
+  for(let i=0;i<ring.length;i++){
+    const a=ring[i], b=ring[(i+1)%ring.length];
+    if(Math.hypot(b[0]-a[0],b[1]-a[1])<0.05) continue;
+    out.push([a,b,[b[0]+off[0],b[1]+off[1]],[a[0]+off[0],a[1]+off[1]]]);
+  }
+  return out;
+}
+/* how far a kerb of height h is thrown, in plan, for a sun vector */
+function kerbOffset(sunv,h){
+  const hz=Math.hypot(sunv[0],sunv[1]);
+  if(!(hz>1e-6)) return null;                        // sun overhead: no throw
+  const alt=Math.asin(Math.max(0.05,Math.min(1,sunv[2])));
+  const reach=h/Math.tan(alt);
+  return [-sunv[0]/hz*reach, -sunv[1]/hz*reach];
+}
+/* Painted BEFORE the items, clipped to the plot and cut out of the items, so
+   a kerb shadow falls on open ground only and no item is shaded by its own. */
+function paintKerbShadows(g,X,Y,k){
+  if(!SHADOW.items||!PLOTITEMS.length) return 0;      // its own switch (24s)
+  const off=kerbOffset(sunFor(null),KERB_H);
+  if(!off) return 0;
+  const clip=plotClipRings();
+  if(!clip.length) return 0;
+  const kinds=['drive','path','patio','deck'];       // the hedge is taller (24v)
+  const quads=[], solid=[], hedges=[];
+  const hoff=kerbOffset(sunFor(null),HEDGE_H);
+  const ringsOf=t=>{
+    const out=[];
+    for(const gp of (typeof joinedRects==='function'?joinedRects(t):[])) out.push(gp.ring);
+    /* a painted run is one shape already: its own rings throw too */
+    for(const it of PLOTITEMS){
+      if(!it||it.type!==t||it.ring) continue;
+      for(const r of (it.rings||[])) if(r&&r.length>=3) out.push(r);
+    }
+    return out;
+  };
+  for(const t of kinds){
+    for(const r of ringsOf(t)){ kerbQuads(r,off).forEach(q=>quads.push(q)); solid.push(r); }
+  }
+  /* the hedge: its own height, its own dapple, and it is NOT cut out of the
+     items -- a hedge shades whatever is beside it */
+  if(hoff) for(const r of ringsOf('hedge')){
+    hedgeDapple(r,hoff).forEach(q=>hedges.push(q));
+    solid.push(r);                                   // but not its own footprint
+  }
+  if(!quads.length&&!hedges.length) return 0;
+  g.save();
+  g.beginPath();                                     // inside the plot ...
+  clip.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                     :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+  g.clip();
+  g.beginPath();                                     // ... and not on an item
+  g.rect(0,0,(g.canvas&&g.canvas.width)||1e5,(g.canvas&&g.canvas.height)||1e5);
+  solid.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                      :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+  g.clip('evenodd');
+  if(quads.length){
+    g.beginPath();
+    quads.forEach(q=>{ q.forEach((p,i)=>i?g.lineTo(X(p[0],p[1]),Y(p[0],p[1]))
+                                        :g.moveTo(X(p[0],p[1]),Y(p[0],p[1]))); g.closePath(); });
+    g.fillStyle=KERB_RGBA;
+    g.fill('nonzero');                               // one tone, however they overlap
+  }
+  g.restore();
+  /* THE HEDGE'S SHADOW, on the plot AND on the other items (24v): inside the
+     plot, and out of its own footprint only. One fill, so the patches do not
+     double where they overlap. */
+  if(hedges.length){
+    g.save();
+    g.beginPath();
+    clip.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                       :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+    g.clip();
+    g.beginPath();
+    g.rect(0,0,(g.canvas&&g.canvas.width)||1e5,(g.canvas&&g.canvas.height)||1e5);
+    for(const r of ringsOf('hedge')){
+      r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                        :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath();
+    }
+    g.clip('evenodd');
+    g.beginPath();
+    hedges.forEach(q=>{ q.forEach((p,i)=>i?g.lineTo(X(p[0],p[1]),Y(p[0],p[1]))
+                                         :g.moveTo(X(p[0],p[1]),Y(p[0],p[1]))); g.closePath(); });
+    g.fillStyle=HEDGE_RGBA;
+    g.fill('nonzero');
+    g.restore();
+  }
+  return quads.length+hedges.length;
+}
 function paintGroundShadows(g,X,Y,live){
   if(!SHADOW.on) return 0;
   const mpx=Math.hypot(X(1,0)-X(0,0),Y(1,0)-Y(0,0));
@@ -12027,6 +12922,7 @@ function paintGroundShadows(g,X,Y,live){
 function renderScene(g,W,H,live,scale,skipFurniture){
   const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const k=scale||1;
+  const kw=lineKw(k);
   g.clearRect(0,0,W,H);
   g.fillStyle=css('--paper')||'#faf9f6';
   g.fillRect(0,0,W,H);
@@ -12069,7 +12965,9 @@ function renderScene(g,W,H,live,scale,skipFurniture){
     /* Plot furniture goes in at the rank boundary: after the last land
        polygon, before the first building. That single placement is what makes
        a building cut a hedge without any geometry being cut. */
-    if(!furnished&&rankTheme(f)>=2){ paintPlotItems(g,X,Y,k,live); furnished=true; }
+    if(!furnished&&rankTheme(f)>=2){
+      try{ paintKerbShadows(g,X,Y,k); }catch(_){}    // the kerb, under the items (24r)
+      paintPlotItems(g,X,Y,k,live); furnished=true; }
     const th=f.properties.Theme;
     /* A BUILDING KEEPS ITS OWN COLOUR, IN THE SELECTION OR OUT OF IT.
        The highlight says which PLOT is being surveyed. That is a statement
@@ -12090,26 +12988,105 @@ function renderScene(g,W,H,live,scale,skipFurniture){
     const fill= themeHas(f.properties,'Buildings')?css('--bld')
       /* a feature can be two things at once; a building that is also land
          is drawn as a building, which is the thing being surveyed */
+      /* THE PLOT IS GREEN ON PAPER (24o). 24k printed the screen yellow at
+         George's word; he wants the green back. Yellow on screen, green on
+         the sheet, as it was before 24k. */
       : selHas(i)?css(live?'--landsel':'--landsel-paper')
       : themeHas(f.properties,'Land')?css('--land')
       : themeHas(f.properties,'Roads Tracks And Paths')?css('--road') : '#f2f1ec';
     /* one path for the whole feature, even-odd, so a hole reads as a hole
        rather than as a second solid painted over the first */
     polyMulti(ringsAll(f.geometry),fill);
+    /* THE PLOT IS NOT ONE FLAT WASH (24g): patches a shade either side of the
+       green, clipped to the plot. Only the selected plot -- the neighbours
+       are context and stay quiet. */
+    if(selHas(i)){
+      g.save(); g.clip('evenodd');
+      drawWash(g,ringsAll(f.geometry),X,Y,k);
+      g.restore();
+    }
   }
   /* An extract with no buildings in it never crosses the rank boundary, so
      the furniture would never be laid down at all. */
-  if(!furnished) paintPlotItems(g,X,Y,k,live);
+  if(!furnished){
+    try{ paintKerbShadows(g,X,Y,k); }catch(_){}
+    paintPlotItems(g,X,Y,k,live);
+  }
   const rank={'Road Or Track':0,'Network Or Polygon Closing Geometry':1,'General Feature':2,'Building':3};
   const ls=[...LINES].sort((a,b)=>(rank[a.properties.DescriptiveGroup]??4)-(rank[b.properties.DescriptiveGroup]??4));
-  for(const f of ls){
-    const dg=f.properties.DescriptiveGroup, dt=f.properties.DescriptiveTerm;
-    let col='#5c5c58',w=2;
-    if(dt==='Division'||dt==='Inferred Property Closing Link'||dt==='Polygon Closing Link'){col='#0a7a4e';w=2;}
-    else if(dg==='Building'){col='#96564a';w=2;}
-    else if(dg==='Road Or Track'){col='#c2b892';w=1.5;}
-    lineParts(f.geometry).forEach(p=>stroke(p,col,w));
+  /* AN ITEM ON THE GROUND HIDES THE OS LINES UNDER IT (24j). The land and the
+     plot items are already down; the wall / fence / building lines are about
+     to be stroked on top, and a drive or a path laid across a wall had that
+     grey line drawn straight over it -- the dark lines George circled. So the
+     whole area, minus every plot item, is set as the clip: the lines paint on
+     open ground and nowhere an item covers. BUILDINGS ARE HELD BACK from
+     this and stroked after the clip is released (24l) -- the 24j comment
+     claimed they were exempt and they were not, so a drive laid over a
+     building footprint erased that building's outline. A building's outline
+     reads over anything on the ground. */
+  const punch=(typeof itemRings==='function')?itemRings():[];
+  const plotRings=(typeof plotClipRings==='function')?plotClipRings():[];
+  const haveClip=punch.length>0&&plotRings.length>0;
+  if(haveClip){
+    /* THE HOLES STOP AT THE PLOT (24p). An item is painted only inside the
+       plot, but its raw ring was punched out of the WHOLE sheet -- so a box
+       dragged past the boundary erased the wall and fence lines beyond it,
+       where nothing was ever drawn. Two clips, nested: the lines are drawn
+       everywhere EXCEPT (the items, within the plot). Outside the plot no
+       item can reach them.
+       Built as: clip A = the plot; then clip B = the whole sheet minus the
+       items, even-odd. Their intersection is 'in the plot and not on an
+       item'. But lines OUTSIDE the plot would then be clipped away too -- so
+       the lines are stroked TWICE: once under (A ∩ B) for inside the plot,
+       once under (not A) for outside it. */
+    g.save();
+    g.beginPath();
+    g.rect(0,0,(g.canvas&&g.canvas.width)||1e5,(g.canvas&&g.canvas.height)||1e5);
+    plotRings.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                            :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+    g.clip('evenodd');                 // everything OUTSIDE the plot
   }
+  const held=[];
+  const strokeLines=()=>{
+    for(const f of ls){
+      const dg=f.properties.DescriptiveGroup, dt=f.properties.DescriptiveTerm;
+      let col='#5c5c58',w=2;
+      if(dt==='Division'||dt==='Inferred Property Closing Link'||dt==='Polygon Closing Link'){col='#0a7a4e';w=2;}
+      else if(dg==='Building'){col='#96564a';w=2;}
+      else if(dg==='Road Or Track'){col='#c2b892';w=1.5;}
+      /* a building's outline is not punched: it is kept back and drawn once the
+         item-shaped holes are released, so it reads over the item (24l). The
+         plot's own boundary -- the green Division and closing links -- the same
+         (24o): a drive laid to the edge was half-covering it. */
+      /* ...and any line lying ALONG the selected plot's boundary, whatever
+         feature carries it (24q): a wall or fence on the plot edge is the
+         plot edge, and a drive laid to it was nicking it. */
+      const boundary=(dt==='Division'||dt==='Inferred Property Closing Link'||dt==='Polygon Closing Link')
+                   ||lineOnPlotBoundary(f,plotRings);
+      if(dg==='Building'||boundary){ if(!held.some(h=>h[0]===f)) held.push([f,col,w]); continue; }
+      lineParts(f.geometry).forEach(p=>stroke(p,col,w));
+    }
+  };
+  if(haveClip){
+    strokeLines();                     // pass 1: outside the plot, nothing punched
+    g.restore();
+    g.save();
+    g.beginPath();                     // pass 2: inside the plot ...
+    plotRings.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                            :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+    g.clip();
+    g.beginPath();                     // ... minus the items
+    g.rect(0,0,(g.canvas&&g.canvas.width)||1e5,(g.canvas&&g.canvas.height)||1e5);
+    punch.forEach(r=>{ r.forEach((q,i)=>i?g.lineTo(X(q[0],q[1]),Y(q[0],q[1]))
+                                        :g.moveTo(X(q[0],q[1]),Y(q[0],q[1]))); g.closePath(); });
+    g.clip('evenodd');
+    strokeLines();
+    g.restore();
+  } else {
+    strokeLines();
+  }
+  for(const [f,col,w] of held)
+    lineParts(f.geometry).forEach(p=>stroke(p,col,w));
   /* THE SHADOW GOES DOWN BEFORE THE BUILDINGS DO. It lies on the ground --
      the land, the road, the plot items -- and every roof is painted over it,
      which is what keeps a building out of its own shadow. */
@@ -12531,8 +13508,9 @@ function renderScene(g,W,H,live,scale,skipFurniture){
        there — the drawing is about the covering, and the export is scaled up
        so a screen weight comes out fat and the green shouts. Thinner again,
        and faded, so it reads as a boundary rather than a highlighter. */
-    g.lineWidth=(live?2.4:0.5)*k;
-    g.strokeStyle=live?C_ROOF:C_ROOF_PAPER;
+    /* THE ROOF OUTLINE, SCREEN WEIGHT AND COLOUR ON PAPER TOO (24k) */
+    g.lineWidth=2.4*kw;
+    g.strokeStyle=C_ROOF;
     for(let i=0;i<R.ring.length;i++){
       const a=R.ring[i],b=R.ring[(i+1)%R.ring.length];
       g.setLineDash(R.gable[i]?[9*k,7*k]:[]);
@@ -12660,8 +13638,10 @@ function renderScene(g,W,H,live,scale,skipFurniture){
        as a tinted box, which is what George saw the second time.
        The green edge and the white corner handles carry it perfectly well,
        and an outline that gets a roof paints itself anyway. */
+    /* ON PAPER, A HAIRLINE, FADED -- the roof's own ring already was (0.5,
+       C_ROOF_PAPER) and this outline sat over it at 1.2 in full green (24b) */
     g.strokeStyle=kind==='main'?C_ROOF:C_ROOF2;
-    g.lineWidth=(open?2.4:(live?2.4:1.2))*k;
+    g.lineWidth=2.4*kw;
     g.setLineDash(open?[8*k,6*k]:[]); g.stroke(); g.setLineDash([]);
     if(live) P.forEach(p2=>{g.beginPath();g.arc(p2[0],p2[1],5*k,0,7);
       g.fillStyle='#fff';g.fill();g.strokeStyle='#1c1c1a';g.lineWidth=2*k;g.stroke();});
@@ -12828,6 +13808,9 @@ function renderScene(g,W,H,live,scale,skipFurniture){
        key. */
     const ax=X(PT[0],PT[1]), ay=Y(PT[0],PT[1]);
     if(live){
+      /* BACK TO 8 px (24m). 24j read 'the circles in the plot area' as this
+         one and enlarged it; George meant the garden's soft discs, which 24l
+         took to 4x. This is the coordinate anchor and it was never the ask. */
       g.beginPath();g.arc(ax,ay,8*k,0,7);
       g.strokeStyle='#fff';g.lineWidth=4*k;g.stroke();
       g.strokeStyle=css('--accent')||'#b0421a';g.lineWidth=2.5*k;g.stroke();
@@ -12919,6 +13902,8 @@ function renderScene(g,W,H,live,scale,skipFurniture){
      only, never on the sheet */
   if(live) try{ drawItemMeasure(g,X,Y,k||1); }catch(_){}
   if(live) try{ drawGhostPlan(g,X,Y,k||1); }catch(_){}
+  if(live) try{ drawBldPreview(g,X,Y,k||1); }catch(_){}
+  if(live) try{ drawBldCut(g,X,Y,k||1); }catch(_){}
   if(live) try{ drawRulers(g,X,Y,k||1); }catch(_){}
   return view;
 }
@@ -13576,12 +14561,23 @@ function drawGhostPlan(g,X,Y,k){
      the right point and the wrong size: on an offscreen render it shrank to a
      smudge, invisibly, inside a catch. One metre through X is the honest
      pixels-per-metre of the frame actually being painted. */
-  const ppmScreen=X(G.x+1,G.y)-X(G.x,G.y);
-  const sPx=ppmScreen/G.ppm;              // this render's px per plan px
-  g.save();
+  /* THE PICTURE FOLLOWS THE MATHS (23b). One plan pixel to the right of the
+     plan's centre, sent through ghostToMap and then through THIS render's
+     X/Y, is a screen vector: its length is the pixels per plan pixel and its
+     angle is where the plan's right-hand edge points on screen -- the plan's
+     own turn AND the view's, together. The old way took the x-component of a
+     metre for the scale (negative past ninety degrees: the plan drew
+     mirrored and small) and rotated by the plan's turn alone (the view's
+     146-degree turn ignored). Placing, snapping and the scale clicks all
+     went through ghostToMap and were right; only what George could see was
+     wrong, which is how a building came to land 'not where it was put'. */
   const a=[X(G.x,G.y),Y(G.x,G.y)];
+  const m1=ghostToMap(G.cx+1,G.cy);
+  const dx=X(m1[0],m1[1])-a[0], dy=Y(m1[0],m1[1])-a[1];
+  const sPx=Math.hypot(dx,dy);            // this render's px per plan px
+  g.save();
   g.translate(a[0],a[1]);
-  g.rotate(G.rot*Math.PI/180);
+  g.rotate(Math.atan2(dy,dx));
   g.globalAlpha=(G.opacity==null?0.45:G.opacity);
   if(G.layers&&G.layers.length){
     /* the composer's own dress: walls and windows, no words. The layers are
@@ -13639,6 +14635,60 @@ function drawRulers(g,X,Y,k){
     g.fillStyle='#8f3413';
     g.fillText(txt,mx,my);
   }
+  /* THE REPEATER, over the marks and only for the measurement IN HAND (22x).
+     A ruler already laid needs no loupe -- nothing is covering it. */
+  if(RULERDRAG&&RULERDRAG.b){
+    const bx=X(RULERDRAG.b[0],RULERDRAG.b[1]), by=Y(RULERDRAG.b[0],RULERDRAG.b[1]);
+    const W=(g.canvas&&g.canvas.width)||0, H=(g.canvas&&g.canvas.height)||0;
+    const P=rulerLoupe(bx,by,W,H,k);
+    /* the leader, so a bubble pushed sideways off a screen edge still says
+       which point it is repeating. IT STOPS AT THE RIM, not at the centre:
+       a leader run all the way in ends on the very pixel the crosshair
+       leaves a hole for, which is the thumb problem again in miniature. */
+    const lvx=P.cx-bx, lvy=P.cy-by, lvd=Math.hypot(lvx,lvy)||1;
+    const ex=P.cx-lvx/lvd*P.rd, ey=P.cy-lvy/lvd*P.rd;
+    g.lineWidth=3.2*k; g.strokeStyle='rgba(255,255,255,0.85)';
+    g.beginPath(); g.moveTo(bx,by); g.lineTo(ex,ey); g.stroke();
+    g.lineWidth=1.2*k; g.strokeStyle='rgba(176,66,26,0.75)';
+    g.beginPath(); g.moveTo(bx,by); g.lineTo(ex,ey); g.stroke();
+    /* the bubble: paper first, so a magnified transparent map has something
+       to sit on rather than the drawing showing through it */
+    g.beginPath(); g.arc(P.cx,P.cy,P.rd,0,Math.PI*2);
+    g.fillStyle='rgba(253,252,249,0.98)'; g.fill();
+    g.save();
+    g.beginPath(); g.arc(P.cx,P.cy,P.rd,0,Math.PI*2); g.clip();
+    /* THE MAP AS IT HAS JUST BEEN PAINTED. drawRulers is the last thing the
+       live pass does, so every pixel under the thumb is already on this
+       canvas: copying a square of it and blowing it up is a TRUE magnifier,
+       not a second render of an approximation of the scene. Wrapped, because
+       a canvas that will not read back must cost the frame nothing. */
+    try{
+      g.drawImage(g.canvas, bx-P.rs, by-P.rs, P.rs*2, P.rs*2,
+                            P.cx-P.rd, P.cy-P.rd, P.rd*2, P.rd*2);
+    }catch(_){}
+    g.restore();
+    /* the rim, in the ruler's own colours so it reads as instrument */
+    g.lineWidth=3.2*k; g.strokeStyle='rgba(255,255,255,0.85)';
+    g.beginPath(); g.arc(P.cx,P.cy,P.rd,0,Math.PI*2); g.stroke();
+    g.lineWidth=1.6*k; g.strokeStyle='#b0421a';
+    g.beginPath(); g.arc(P.cx,P.cy,P.rd,0,Math.PI*2); g.stroke();
+    /* THE CROSSHAIR, WITH A HOLE IN THE MIDDLE. A cross that meets in the
+       centre covers the very pixel it is pointing at, which is the whole
+       complaint about the thumb, in miniature. */
+    const arm=11*k, hole=3*k;
+    /* backed in white first, like every other instrument line in this file:
+       a rust crosshair on magnified dark slate is most of a roof */
+    const cross=()=>{
+      g.beginPath();
+      g.moveTo(P.cx-arm,P.cy); g.lineTo(P.cx-hole,P.cy);
+      g.moveTo(P.cx+hole,P.cy); g.lineTo(P.cx+arm,P.cy);
+      g.moveTo(P.cx,P.cy-arm); g.lineTo(P.cx,P.cy-hole);
+      g.moveTo(P.cx,P.cy+hole); g.lineTo(P.cx,P.cy+arm);
+      g.stroke();
+    };
+    g.lineWidth=3*k; g.strokeStyle='rgba(255,255,255,0.85)'; cross();
+    g.lineWidth=1.4*k; g.strokeStyle='#b0421a'; cross();
+  }
   g.restore();
 }
 /* A masked export goes on WHITE, not the paper tone. The brush is meant to
@@ -13664,7 +14714,20 @@ function exportPaper(masked){
 const HALO_REACH=6;              // metres of fade round an ordinary edge
 /* 22l: a fifth further into the road, as asked -- a frontage wants the
    pavement and the near kerb on the sheet, not just the verge. */
-const HALO_ROAD=14;              // and where the plot meets road or pavement (22m: another fifth)
+/* 24v: THE ROAD NAME IS THE EDGE OF THE FADE. 14 m carried the context most
+   of the way across an ordinary street -- George's frontage reached past the
+   far kerb and showed the plots opposite. roadLabelSpot puts the label at the
+   road's MID-WIDTH, and he wants the ramp finished by the time it gets there,
+   so the reach is that half-width. Clamped either side for a track and for a
+   dual carriageway, and it falls back to the old figure when there is no road
+   to measure. */
+const HALO_ROAD_MIN=4, HALO_ROAD_MAX=14;
+function haloRoadReach(){
+  const spot=(typeof roadLabelSpot==='function')?roadLabelSpot():null;
+  const across=spot&&isFinite(spot.across)?spot.across:0;
+  if(!(across>0.4)) return HALO_ROAD_MAX;
+  return Math.max(HALO_ROAD_MIN,Math.min(HALO_ROAD_MAX,across/2));
+}
 const HALO_BANDS=14;             // nested unions; the brush uses twelve
 const HALO_POWER=1.7;            // the curve: >1 keeps the near ground solid
 let HALO=false;                  // the export in hand, not a stored setting
@@ -13807,7 +14870,7 @@ function haloPasses(view,hasRoad,n){
   const out=[];
   for(let j=0;j<N;j++){
     const B=haloBand(j,N);
-    const dRing=B.f*HALO_REACH, dRoad=hasRoad?B.f*HALO_ROAD:0;
+    const dRing=B.f*HALO_REACH, dRoad=hasRoad?B.f*haloRoadReach():0;
     out.push({alpha:B.alpha, dRing:dRing, dRoad:dRoad,
               wRing:2*dRing*S, wRoad:2*dRoad*S});
   }
@@ -13895,6 +14958,7 @@ function exportPng(){
   /* 22h: the rows are 24 apart, not 34, and the strip is only as deep as
      what sits in it -- title, key, notice, credit. */
   const M=1600, FOOT=252, k=M/620;      // k scales linework up from screen sizing
+  const NOTICE_ROOM=640;                // the notice's own measure (24q)
   const c=document.createElement('canvas');
   c.width=M; c.height=M+FOOT;
   const g=c.getContext('2d');
@@ -14009,7 +15073,7 @@ function exportPng(){
   /* The legend has to name what the PAPER shows, so it takes the green the
      export actually paints, not the yellow that lives on screen. */
   const swatches=[[css('--bld')||'#e2c4ba','Building'],[css('--land')||'#eef0e5','Land / yard'],
-                  [css('--landsel-paper')||'#cfe4b4','Plot']];
+                  [css('--landsel-paper')||'#cfe4b4','Plot']];      // 24o: green on the sheet again
   if(PLOTITEMS.length){
     const kinds={};
     PLOTITEMS.forEach(it=>{kinds[it.type]=true;});
@@ -14017,12 +15081,12 @@ function exportPng(){
     if(kinds.drive) swatches.push([css('--drive')||'#6b6f72','Drive']);
     if(kinds.path)  swatches.push([css('--path')||'#c6c9c6','Path']);
     if(kinds.deck)  swatches.push([css('--deck')||'#9a7649','Decking']);
-    if(kinds.patio) swatches.push([css('--patio')||'#f4f3f0','Patio']);
+    if(kinds.patio) swatches.push([css('--patio')||'#e4e1d6','Patio']);
   }
   /* third element is the MARK: a line, or the coordinate dot. Without it the
      dot would have to be laid out separately and the row would stop landing
      on the margin. */
-  const strokes=[['#5c5c58','Wall / fence / hedge','line'],
+  const strokes=[['#5c5c58','Wall / fence','line'],
                  ['#0a7a4e','Division','line'],
                  ['#96564a','Building outline','line']];
   g.font='21px system-ui,-apple-system,"Segoe UI",sans-serif';
@@ -14113,15 +15177,21 @@ function exportPng(){
        its place and the gap above it does not change. */
     /* IT STARTS WHERE THE KEY STARTS (22e). The key's two rows are
        right-aligned and each is as wide as its own contents, so the key's
-       left edge is the leftmost of them -- the 'Wall / fence / hedge' row in
-       practice. The notice is left-aligned there and wraps to the same right
-       margin, so its block is the key's block: same left, same right. */
+       left edge is the leftmost of them -- the strokes row, in practice. The
+       notice is left-aligned there; since 24q it keeps its own measure, so a
+       change of wording in the key cannot re-flow it. */
     const keyLeft=Math.min(RIGHT-rowWidth(swatches),RIGHT-rowWidth(strokes));
     g.fillStyle='#96948c';
     g.textAlign='left';
     const px=15;
     g.font=px+'px system-ui,-apple-system,"Segoe UI",sans-serif';
-    const room=RIGHT-keyLeft;
+    /* THE NOTICE HAS ITS OWN COLUMN (24q). room was RIGHT-keyLeft, so the
+       notice's width was set by the WIDEST KEY LABEL: shortening one label
+       narrowed the key, pushed keyLeft right, wrapped the notice to an extra
+       line and dropped that line onto the footer row. The notice is a paragraph of fixed measure
+       now -- at least as wide as the key, never narrower -- so a wording
+       change cannot re-flow it into the furniture. */
+    const room=Math.max(RIGHT-keyLeft,NOTICE_ROOM);
     const lines=[];
     let line='';
     for(const word of notice.split(' ')){
@@ -14134,8 +15204,9 @@ function exportPng(){
     /* HUNG OFF THE KEY, NOT THE BOTTOM (22h). Set from the bottom it drifted
        away from the block it belongs to whenever the strip changed depth;
        20 px under the last key row keeps it with the key. */
+    const noticeLeft=RIGHT-room;
     lines.forEach((t,i)=>{
-      g.fillText(t,keyLeft,M+134+i*lead);
+      g.fillText(t,noticeLeft,M+134+i*lead);
     });
   }
   g.fillStyle='#96948c'; g.font='18px system-ui,-apple-system,"Segoe UI",sans-serif';
@@ -14232,7 +15303,7 @@ $('haloOn').onchange=()=>{
   if($('haloOn').checked&&!haloShapeRings().length)
     say('Highlight a plot or draw a roof first — the halo is cut from those outlines.');
   else say(on?('Map PNG will cut to the plot and every roof outline: '+HALO_REACH
-              +' m of context, '+HALO_ROAD+' m where an edge meets the road.')
+              +' m of context, '+haloRoadReach().toFixed(1)+' m where an edge meets the road.')
              :'Map PNG back to the full square.');
   draw();
 };
@@ -14670,6 +15741,10 @@ let SHAPES=[], DRAW=null;
    dropping one alone does nothing at the zoom where the other is binding. */
 const SNAP_PX=8;           // screen pixels
 const SNAP_MAX=0.25;       // metres — hard cap
+/* A FLOOR AS WELL AS A CAP (25b). Eight screen pixels shrinks to a few
+   centimetres when zoomed in, so a wall a hand's breadth away would not take.
+   George: anything closer than 20 cm should snap, whatever the zoom. */
+const PLOT_SNAP_MIN=0.20;
 const SNAP_ANG=8;          // degrees — angle snap tolerance
 const ALIGN_REACH=8;       // metres — how far an alignment may look for a corner
 let SNAPHIT=null;          // last snapped target, for the on-screen cue
@@ -14690,6 +15765,25 @@ function ghostToMap(rx,ry){
      right way up while the metres agree with the compass. */
   const u=(rx-G.cx)*k, v=(G.cy-ry)*k;
   return [G.x + u*c + v*s, G.y - u*s + v*c];
+}
+/* HOW FAR THE MAP ITSELF IS TURNED, in degrees. The screen angle of the
+   plan's own right-hand edge is exactly GHOST.rot minus this -- measured,
+   not assumed: see the gate, which drives three view angles through
+   ghostToMap and the view and reads the result off the screen. */
+function viewTurnDeg(){ return (typeof ROT==='number'&&isFinite(ROT))?ROT*180/Math.PI:0; }
+const wrapDeg=d=>{ d=((+d||0)%360+360)%360; return d>180?d-360:d; };
+/* A PLAN ARRIVES LEVEL WITH THE SHEET (23c). GHOST.rot is a bearing on the
+   GROUND, which is what lets a plan stay put when the map is turned under
+   it -- so a plan arriving at rot 0 is aligned to map north, and on George's
+   146-degree view it came in slanted by 146 degrees. Arriving level means
+   arriving at the view's own turn. rot0 remembers what that was, so the
+   Building panel's Turn reads zero on arrival and turns FROM there rather
+   than from a number the plan never had. */
+function ghostArrive(){
+  if(!GHOST) return 0;
+  GHOST.rot0=wrapDeg(viewTurnDeg());
+  GHOST.rot=GHOST.rot0;
+  return GHOST.rot;
 }
 function mapToGhost(mx,my){
   const G=GHOST, a=G.rot*Math.PI/180, c=Math.cos(a), s=Math.sin(a);
@@ -14888,6 +15982,7 @@ function ghostAdopt(){
   GHOST.ring=g.ring; GHOST.segs=g.segs;
   GHOST.region=Object.assign({},F.region);
   GHOST.cx=F.region.w/2; GHOST.cy=F.region.h/2;
+  if(GHOST.rot0==null) ghostArrive();             // level with the sheet (23c) -- once (24b)
   if(F.plan&&F.plan.pxPerM){
     GHOST.ppm=F.plan.pxPerM;
     GHOST.ready=true;
@@ -15401,6 +16496,724 @@ function ghostSyncPanel(){
     });
   }
 }
+/* ===================== TWO FOOTPRINTS INTO ONE (22z) =====================
+   A plan placed over a MasterMap building is the SAME building -- an agent's
+   plan of the whole house, or an extension drawn against the back wall. It
+   merges. The union is written here, for the shapes buildings actually make:
+   two simple polygons that overlap, or share a wall, or one inside the other,
+   and any of that at any angle.
+
+   The method is the honest one: cut every edge of each ring where it meets
+   the other (crossings, and the other ring's corners that sit on it), then
+   keep the pieces that are not inside the other ring, and walk them into a
+   loop. The awkward case is a SHARED WALL -- a piece that lies on both
+   boundaries. It is kept if the far side of it (outside this ring) is also
+   outside the other ring, and dropped if the other ring is what lies there:
+   two rooms either side of a wall have no wall between them once they are
+   one building. Tolerance U_EPS is a centimetre: a traced plan snapped to a
+   MasterMap wall is not on it to a micron, and must still count as on it. */
+const U_EPS=0.01;
+function uClean(r){
+  const out=[];
+  for(const p of r){
+    if(!out.length||Math.hypot(p[0]-out[out.length-1][0],p[1]-out[out.length-1][1])>=U_EPS)
+      out.push([+p[0],+p[1]]);
+  }
+  while(out.length>1&&Math.hypot(out[0][0]-out[out.length-1][0],out[0][1]-out[out.length-1][1])<U_EPS) out.pop();
+  return out;
+}
+function uCCW(r){
+  let s2=0;
+  for(let i=0;i<r.length;i++){ const a=r[i], b=r[(i+1)%r.length]; s2+=a[0]*b[1]-b[0]*a[1]; }
+  return s2>=0?r.slice():r.slice().reverse();
+}
+function uParam(a,b,p){
+  const dx=b[0]-a[0], dy=b[1]-a[1], L2=dx*dx+dy*dy||1e-12;
+  const t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L2;
+  return {t:t, d:Math.hypot(p[0]-(a[0]+t*dx),p[1]-(a[1]+t*dy))};
+}
+function uCross(a,b,c,d){
+  const rx=b[0]-a[0], ry=b[1]-a[1], sx=d[0]-c[0], sy=d[1]-c[1];
+  const den=rx*sy-ry*sx;
+  if(Math.abs(den)<1e-12) return null;
+  const t=((c[0]-a[0])*sy-(c[1]-a[1])*sx)/den, u=((c[0]-a[0])*ry-(c[1]-a[1])*rx)/den;
+  if(t<-1e-9||t>1+1e-9||u<-1e-9||u>1+1e-9) return null;
+  return [a[0]+t*rx, a[1]+t*ry];
+}
+function uOnRing(p,R){
+  for(let i=0;i<R.length;i++){
+    const q=uParam(R[i],R[(i+1)%R.length],p);
+    if(q.d<U_EPS&&q.t>-1e-6&&q.t<1+1e-6) return true;
+  }
+  return false;
+}
+function uInRing(p,R){ return pip(p,R.concat([R[0]])); }
+/* every edge of R cut where O meets it */
+function uSplit(R,O){
+  const out=[];
+  for(let i=0;i<R.length;i++){
+    const a=R[i], b=R[(i+1)%R.length], cuts=[];
+    for(const q of O){ const s2=uParam(a,b,q); if(s2.d<U_EPS&&s2.t>1e-6&&s2.t<1-1e-6) cuts.push({t:s2.t,p:[q[0],q[1]]}); }
+    for(let j=0;j<O.length;j++){
+      const x=uCross(a,b,O[j],O[(j+1)%O.length]);
+      if(!x) continue;
+      const s2=uParam(a,b,x);
+      if(s2.t>1e-6&&s2.t<1-1e-6) cuts.push({t:s2.t,p:x});
+    }
+    cuts.sort((u,v)=>u.t-v.t);
+    out.push(a);
+    let last=a;
+    for(const c of cuts){
+      if(Math.hypot(c.p[0]-last[0],c.p[1]-last[1])>=U_EPS&&Math.hypot(c.p[0]-b[0],c.p[1]-b[1])>=U_EPS){
+        out.push(c.p); last=c.p;
+      }
+    }
+  }
+  return out;
+}
+/* Returns {ring, parts, overlap, shared}: the largest loop, how many loops
+   there were, how much area the two had in common, and how much wall they
+   shared with each other's interior on the far side. The caller decides
+   from those whether this is one building. Null when either ring is not a
+   polygon. */
+function unionRings(A0,B0){
+  let A=uCCW(uClean(A0)), B=uCCW(uClean(B0));
+  if(A.length<3||B.length<3) return null;
+  A=uSplit(A,B); B=uSplit(B,A); A=uSplit(A,B);
+  const snapTo=(p,pts)=>{ for(const q of pts) if(Math.hypot(p[0]-q[0],p[1]-q[1])<U_EPS) return q; return p; };
+  B=B.map(p=>snapTo(p,A));
+  const segs=[]; let shared=0;
+  const take=(R,O,fromA)=>{
+    for(let i=0;i<R.length;i++){
+      const a=R[i], b=R[(i+1)%R.length], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+      if(uOnRing(m,O)){
+        if(!fromA) continue;                        // B's copy of a shared piece
+        const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+        const far=[m[0]+dy/L*U_EPS*3, m[1]-dx/L*U_EPS*3];   // to the right: outside A
+        if(uInRing(far,O)){ shared+=L; continue; }         // the other building is there
+        segs.push([a,b]); continue;
+      }
+      if(uInRing(m,O)) continue;
+      segs.push([a,b]);
+    }
+  };
+  take(A,B,true); take(B,A,false);
+  const key=p=>p[0].toFixed(3)+','+p[1].toFixed(3);
+  const byStart=new Map();
+  for(const g2 of segs){ const k=key(g2[0]); if(!byStart.has(k)) byStart.set(k,[]); byStart.get(k).push(g2); }
+  const used=new Set(), loops=[];
+  for(const s0 of segs){
+    if(used.has(s0)) continue;
+    const loop=[s0[0]]; let cur=s0; used.add(cur); let guard=0;
+    while(guard++<20000){
+      const nk=key(cur[1]);
+      if(nk===key(loop[0])) break;
+      const cand=(byStart.get(nk)||[]).filter(x=>!used.has(x));
+      if(!cand.length){ loop.length=0; break; }
+      cur=cand[0]; used.add(cur); loop.push(cur[0]);
+    }
+    if(loop.length>=3) loops.push(uClean(loop));
+  }
+  if(!loops.length) return null;
+  const areaOf=r=>ringArea(r.concat([r[0]]));
+  loops.sort((p,q)=>areaOf(q)-areaOf(p));
+  /* a shared wall leaves the old corners standing in a straight run; they
+     are not corners of the merged building and go */
+  const straight=r=>r.filter((p,i)=>{
+    const a=r[(i+r.length-1)%r.length], b=r[(i+1)%r.length];
+    const cr=(p[0]-a[0])*(b[1]-a[1])-(p[1]-a[1])*(b[0]-a[0]);
+    return Math.abs(cr)>U_EPS*Math.hypot(b[0]-a[0],b[1]-a[1]);
+  });
+  const top=loops.length===1?straight(loops[0]):loops[0];
+  const aA=areaOf(A), aB=areaOf(B), aU=areaOf(top);
+  return {ring:top, parts:loops.length, overlap:loops.length===1?Math.max(0,aA+aB-aU):0,
+          shared:shared, area:aU};
+}
+/* A MINUS B, for the ground a building takes out of a plot (23b). The same
+   cutting as the union; what is kept differs: A's pieces outside B, and B's
+   pieces inside A run BACKWARDS so the boundary keeps turning the same way.
+   A shared wall stays A's if what lies just inside A there is clear of B.
+   Loops that
+   come out anticlockwise are outers, clockwise ones are holes. */
+function uSigned(r){ let t=0; for(let i=0;i<r.length;i++){ const p=r[i], q=r[(i+1)%r.length]; t+=p[0]*q[1]-q[0]*p[1]; } return t/2; }
+function uChain(segs){
+  const key=p=>p[0].toFixed(3)+','+p[1].toFixed(3);
+  const byStart=new Map();
+  for(const g2 of segs){ const k=key(g2[0]); if(!byStart.has(k)) byStart.set(k,[]); byStart.get(k).push(g2); }
+  const used=new Set(), loops=[];
+  for(const s0 of segs){
+    if(used.has(s0)) continue;
+    const loop=[s0[0]]; let cur=s0; used.add(cur); let guard=0;
+    while(guard++<20000){
+      const nk=key(cur[1]);
+      if(nk===key(loop[0])) break;
+      const cand=(byStart.get(nk)||[]).filter(x=>!used.has(x));
+      if(!cand.length){ loop.length=0; break; }
+      cur=cand[0]; used.add(cur); loop.push(cur[0]);
+    }
+    if(loop.length>=3) loops.push(uClean(loop));
+  }
+  return loops;
+}
+function diffRings(A0,B0){
+  let A=uCCW(uClean(A0)), B=uCCW(uClean(B0));
+  if(A.length<3||B.length<3) return null;
+  A=uSplit(A,B); B=uSplit(B,A); A=uSplit(A,B);
+  const snapTo=(p,pts)=>{ for(const q of pts) if(Math.hypot(p[0]-q[0],p[1]-q[1])<U_EPS) return q; return p; };
+  B=B.map(p=>snapTo(p,A));
+  const segs=[];
+  for(let i=0;i<A.length;i++){
+    const a=A[i], b=A[(i+1)%A.length], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    if(uOnRing(m,B)){
+      /* a shared wall: it stays A's only if what lies just INSIDE A there
+         is not B -- the far-side test the union uses would keep A minus A */
+      const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+      const near=[m[0]-dy/L*U_EPS*3, m[1]+dx/L*U_EPS*3];
+      if(uInRing(near,B)) continue;
+      segs.push([a,b]); continue;
+    }
+    if(uInRing(m,B)) continue;
+    segs.push([a,b]);
+  }
+  for(let i=0;i<B.length;i++){
+    const a=B[i], b=B[(i+1)%B.length], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    if(uOnRing(m,A)) continue;
+    if(!uInRing(m,A)) continue;
+    segs.push([b,a]);                                   // backwards
+  }
+  const loops=uChain(segs);
+  if(!loops.length) return null;
+  const outers=loops.filter(l=>uSigned(l)>0), holes=loops.filter(l=>uSigned(l)<0);
+  const parts=outers.map(o=>({outer:o,holes:holes.filter(h=>uInRing(h[0],o))}));
+  let area=0;
+  for(const p of parts){ area+=uSigned(p.outer); for(const h of p.holes) area+=uSigned(h); }
+  return {parts:parts, area:area};
+}
+/* THE EDGE LINES OF A BUILDING: every line part (MasterMap's separate edge
+   features, or ours) that lies along the ring. Dropped with the building,
+   replaced after a merge, and laid for a placed one so it has the same dark
+   red edge as every other. */
+const BLD_EDGE_TOL=0.05;
+function partOnRing(part,ring){
+  if(!part||part.length<2) return false;
+  /* every vertex, and every midpoint too: two corners of a ring are on it
+     whatever runs between them, and a line cutting straight across is not
+     an edge of it */
+  const pts=part.slice();
+  for(let i=0;i<part.length-1;i++) pts.push([(part[i][0]+part[i+1][0])/2,(part[i][1]+part[i+1][1])/2]);
+  for(const p of pts){
+    let ok=false;
+    for(let i=0;i<ring.length;i++){
+      const q=uParam(ring[i],ring[(i+1)%ring.length],p);
+      if(q.d<BLD_EDGE_TOL&&q.t>-1e-6&&q.t<1+1e-6){ ok=true; break; }
+    }
+    if(!ok) return false;
+  }
+  return true;
+}
+function dropLinesAlong(ring){
+  const open=uClean(ring); let dropped=0;
+  LINES=LINES.map(f=>{
+    if(!f||!f.geometry) return f;
+    if(!themeHas(f.properties,'Buildings')&&!(f.properties&&f.properties._bld)) return f;
+    const g=f.geometry;
+    const parts=g.type==='MultiLineString'?g.coordinates:(g.type==='LineString'?[g.coordinates]:null);
+    if(!parts) return f;
+    const keep=parts.filter(p=>!partOnRing(p,open));
+    dropped+=parts.length-keep.length;
+    if(keep.length===parts.length) return f;
+    if(!keep.length) return null;
+    return Object.assign({},f,{geometry:{type:'MultiLineString',coordinates:keep}});
+  }).filter(Boolean);
+  return dropped;
+}
+function bldEdgeLine(ring,toid){
+  const c=uClean(ring).concat([uClean(ring)[0]]).map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]);
+  return {type:'Feature',
+    properties:{Theme:'Buildings',DescriptiveGroup:'Building',DescriptiveTerm:'',
+                TOID:'edge-'+toid,_drawn:true,_bld:toid},
+    geometry:{type:'LineString',coordinates:c}};
+}
+/* THE GROUND A BUILDING STANDS ON. MasterMap's land polygon hugs the
+   building, so when the building goes its ground is a union with the plot
+   -- exact, and the plot's area grows by it. When a building is placed the
+   plot loses that ground: a HOLE when it sits clear inside (formPlot's own
+   device, drawn even-odd, area subtracts), a polygon difference when it
+   reaches the boundary. A hole that was a placed building is simply taken
+   out again when that building goes. */
+function plotParts(f){
+  const g=f.geometry;
+  if(g.type==='Polygon') return [g.coordinates];
+  if(g.type==='MultiPolygon') return g.coordinates;
+  return null;
+}
+function setPlotParts(f,parts){
+  if(parts.length===1) f.geometry={type:'Polygon',coordinates:parts[0]};
+  else f.geometry={type:'MultiPolygon',coordinates:parts};
+}
+const closeRing=r=>r.concat([r[0]]).map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]);
+/* MasterMap's garden with the house in it is ONE polygon with a HOLE, and the
+   hole is the whole touching cluster -- house, extensions, conservatory --
+   not one ring per building. So a building coming or going is an edit to
+   that hole: taken out of it by difference when it goes (the hole may split
+   in two), added to it by union when it comes (a second overlapping hole
+   would paint the old building back in, even-odd). Only a building that
+   touches no hole is a new hole, or a notch in the boundary. */
+const holeTouches=(hr,open)=>{ const u=unionRings(hr,open); return !!(u&&u.parts===1&&(u.overlap>0.05||u.shared>=BLD_ABUT)); };
+function plotGive(ring){                                   // the ground comes back to the plot
+  const open=uClean(ring);
+  const order=selAll().concat(AREAS.map((f,i)=>i));
+  for(const i of order){
+    const f=AREAS[i];
+    if(!f||!themeHas(f.properties,'Land')) continue;
+    const parts=plotParts(f); if(!parts) continue;
+    for(let k=0;k<parts.length;k++){
+      for(let h=1;h<parts[k].length;h++){
+        const hr=uClean(parts[k][h]);
+        if(!holeTouches(hr,open)) continue;
+        const d=diffRings(hr,open);
+        const uh=unionRings(hr,open), expectH=uSigned(uCCW(hr))-(uh?uh.overlap:0);
+        if(d&&Math.abs(d.area-expectH)>0.5+0.02*Math.abs(expectH)) return -1;   // does not add up: leave it
+        const rest=(d&&d.parts.length)?d.parts.map(p=>closeRing(p.outer)).filter(r=>ringArea(r)>0.05):[];
+        parts[k].splice(h,1,...rest); setPlotParts(f,parts); return i;
+      }
+      const u=ringsJoin(uClean(parts[k][0]),open);
+      if(u){ parts[k][0]=closeRing(u.ring); setPlotParts(f,parts); return i; }
+    }
+  }
+  /* ground that touches no plot -- a courtyard cleared inside a building --
+     is an island of the selected plot (24c) */
+  for(const i of order){
+    const f=AREAS[i];
+    if(!f||!themeHas(f.properties,'Land')) continue;
+    const parts=plotParts(f); if(!parts) continue;
+    parts.push([closeRing(open)]); setPlotParts(f,parts); return i;
+  }
+  return -1;
+}
+let PLOT_TOOK={i:-1,was:0,took:0};                        // what the last plotTake did (24c)
+function plotTake(ring){                                   // the ground goes to the building
+  PLOT_TOOK={i:-1,was:0,took:0};
+  const r=plotTake1(ring);
+  if(r>=0&&AREAS[r]){ PLOT_TOOK.i=r; PLOT_TOOK.took=PLOT_TOOK.was-featureArea(AREAS[r]); }
+  return r;
+}
+function plotTake1(ring){
+  const open=uClean(ring);
+  const order=selAll().concat(AREAS.map((f,i)=>i));
+  for(const i of order){
+    const f=AREAS[i];
+    if(!f||!themeHas(f.properties,'Land')) continue;
+    const parts=plotParts(f); if(!parts) continue;
+    PLOT_TOOK.was=featureArea(f);
+    for(let k=0;k<parts.length;k++){
+      for(let h=1;h<parts[k].length;h++){
+        const hr=uClean(parts[k][h]);
+        if(!holeTouches(hr,open)) continue;
+        const u=unionRings(hr,open);
+        if(u&&u.parts===1){ parts[k][h]=closeRing(u.ring); setPlotParts(f,parts); return i; }
+      }
+      const outer=uClean(parts[k][0]);
+      const inside=open.every(p=>uInRing(p,outer)&&!uOnRing(p,outer));
+      if(inside){ parts[k].push(closeRing(open)); setPlotParts(f,parts); return i; }
+      const u=unionRings(outer,open);
+      if(!u||u.parts!==1||(u.overlap<0.05&&u.shared<BLD_ABUT)) continue;
+      if(u.overlap<0.05) return -1;                       // abutting only: nothing to take
+      const d=diffRings(outer,open);
+      if(!d||!d.parts.length) continue;
+      /* THE ANSWER HAS TO ADD UP (24c). The union already knows how much the
+         two share; the difference must be the plot less exactly that. A
+         chain that broke and left a sliver loop -- which is what cut George's
+         101 m2 yard to 1.5 -- does not add up, and the plot is left alone. */
+      const expect=uSigned(uCCW(outer))-u.overlap;
+      if(Math.abs(d.area-expect)>0.5+0.02*Math.abs(expect)) return -1;
+      const holes=parts[k].slice(1);
+      const np=d.parts.map(p=>[closeRing(p.outer)].concat(p.holes.map(closeRing)));
+      np[0]=np[0].concat(holes);
+      parts.splice(k,1,...np); setPlotParts(f,parts); return i;
+    }
+  }
+  return -1;
+}
+/* one building, or two? Interior in common, or a run of shared wall at
+   least BLD_ABUT long. A corner touching a corner is neither. */
+const BLD_ABUT=0.3;
+function ringsJoin(A,B){
+  const u=unionRings(A,B);
+  if(!u||u.parts!==1) return null;
+  if(u.overlap<0.05&&u.shared<BLD_ABUT) return null;
+  return u;
+}
+/* PUSH A RING OUT BY d ON EVERY SIDE. Mitred: each corner goes along the
+   bisector of its two edges' outward normals, by d over the cosine of the
+   half-turn, so a square corner moves d out on both axes and a straight run
+   moves d out and no more. The mitre is capped for a corner sharper than
+   about 40 degrees, which a house does not have and a trace artefact might.
+   Works either way round: outward is found from the ring's own winding. */
+function offsetRing(ring,d){
+  const n=ring.length;
+  if(n<3) return ring.map(p=>p.slice());
+  let s2=0;
+  for(let i=0;i<n;i++){ const a=ring[i], b=ring[(i+1)%n]; s2+=a[0]*b[1]-b[0]*a[1]; }
+  const ccw=s2>0;
+  const nrm=(a,b)=>{ const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+                     return ccw?[dy/L,-dx/L]:[-dy/L,dx/L]; };
+  const out=[];
+  for(let i=0;i<n;i++){
+    const p=ring[i], a=ring[(i+n-1)%n], b=ring[(i+1)%n];
+    const n1=nrm(a,p), n2=nrm(p,b);
+    let bx=n1[0]+n2[0], by=n1[1]+n2[1];
+    const bl=Math.hypot(bx,by);
+    if(bl<1e-9){ out.push([p[0]+n1[0]*d,p[1]+n1[1]*d]); continue; }
+    bx/=bl; by/=bl;
+    const cosHalf=Math.max(bx*n1[0]+by*n1[1],0.35);
+    out.push([p[0]+bx*d/cosHalf, p[1]+by*d/cosHalf]);
+  }
+  return out;
+}
+/* the building under a map point, smallest first so an outbuilding drawn
+   inside a curtilage polygon is the one you tapped */
+function buildingAt(mx,my){
+  let best=-1, bestA=Infinity;
+  for(let i=0;i<AREAS.length;i++){
+    const f=AREAS[i];
+    if(!f||!themeHas(f.properties,'Buildings')) continue;
+    if(!polyHit(f,[mx,my])) continue;
+    const a=polyArea(f);
+    if(a<bestA){ bestA=a; best=i; }
+  }
+  return best;
+}
+/* THE PLACED OUTLINE IS A BUILDING LIKE ANY OTHER. It lands in AREAS with
+   the Buildings theme and its own TOID, so the roof tools pick it up by the
+   same click they use for a MasterMap building, the export draws it in the
+   same colour, and the session keeps it. Its scale is the plan's calibrated
+   scale, adjusted by the Size slider; with Internal chosen the traced walls
+   are room faces and the ring is pushed out by BLD_WALL a side. Refuses,
+   and says why, rather than placing a guess. */
+/* THE RING PLACE WILL LAY, from the plan as it stands now: through
+   ghostToMap (position, turn, size), cleaned, pushed out for the walls if
+   Internal is chosen. One function, so the preview on the screen and the
+   building that lands are the same ring by construction (24b). */
+function ghostPlacedRing(){
+  const G=GHOST;
+  if(!G||!G.ring||G.ring.length<3) return null;
+  let ring=G.ring.map(p=>ghostToMap(p[0],p[1]));
+  ring=ring.filter((p,i)=>i===0||Math.hypot(p[0]-ring[i-1][0],p[1]-ring[i-1][1])>0.02);
+  while(ring.length>3&&Math.hypot(ring[0][0]-ring[ring.length-1][0],
+                                  ring[0][1]-ring[ring.length-1][1])<0.02) ring.pop();
+  if(ring.length<3) return null;
+  if(G.inner) ring=offsetRing(ring,BLD_WALL);
+  return ring;
+}
+/* THE PREVIEW (24b). In Building mode the ring is painted over the plan as
+   the building it will be -- the map's building fill, the dark red edge --
+   the moment the trace is in, and it moves with every drag, turn, size and
+   the Internal toggle. George could not tell what Place would lay until it
+   had laid it; an External plan of the house already there laid a building
+   that looked exactly like the house, and read as nothing happening. */
+function drawBldPreview(g,X,Y,k){
+  if(MODE!=='building'||!GHOST||!GHOST.show) return;
+  const ring=ghostPlacedRing();
+  if(!ring) return;
+  g.save();
+  g.beginPath();
+  ring.forEach((p,i)=>{ const x=X(p[0],p[1]), y=Y(p[0],p[1]); i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.closePath();
+  g.fillStyle='rgba(224,180,168,0.55)'; g.fill();
+  g.lineWidth=2.2*k; g.strokeStyle='#96564a'; g.stroke();
+  g.restore();
+}
+function placeBuilding(){
+  const G=GHOST;
+  if(!G||!G.ready) return {err:'no plan is loaded'};
+  if(!G.scaleTrusted) return {err:'the scale is not set'};
+  if(!G.ring||G.ring.length<3) return {err:'the plan has no traced outline'};
+  const ring=ghostPlacedRing();
+  if(!ring) return {err:'the outline collapsed to a line'};
+  const closed=ring.concat([ring[0]]);
+  const area=ringArea(closed);
+  if(area<4) return {err:'the outline is under 4 m²'};
+  const before=snapshotNow();
+  /* THE SAME BUILDING, IF IT IS ON ONE (22z). The first building the outline
+     overlaps or abuts is the HOST: the merged outline replaces its geometry
+     and keeps its TOID, so the map, the roof click and the session all still
+     know it as that building. Any further building the merged outline then
+     reaches is absorbed into the host too. A roof already drawn on any of
+     them is dropped -- its outline is no longer the building's -- and said. */
+  let host=-1, merged=ring, absorbed=[];
+  for(let pass=0;pass<6;pass++){
+    let hit=-1, u=null;
+    for(let i=0;i<AREAS.length;i++){
+      const f=AREAS[i];
+      if(!f||!themeHas(f.properties,'Buildings')||i===host||absorbed.indexOf(i)>=0) continue;
+      u=ringsJoin(merged,rings(f.geometry)[0]);
+      if(u){ hit=i; break; }
+    }
+    if(hit<0) break;
+    if(host<0) host=hit; else absorbed.push(hit);
+    merged=u.ring;
+  }
+  const tidy=r=>r.concat([r[0]]).map(p=>[+p[0].toFixed(3),+p[1].toFixed(3)]);
+  if(host>=0){
+    const hf=AREAS[host], hostToid=hf.properties.TOID, wasArea=polyArea(hf);
+    const gone=[hostToid].concat(absorbed.map(i=>AREAS[i].properties.TOID));
+    let roofs=0;
+    SHAPES=SHAPES.filter(sh=>{ const g2=!!(sh.roof&&gone.indexOf(sh.roof.toid)>=0); if(g2) roofs++; return !g2; });
+    if(ROOF&&gone.indexOf(ROOF.toid)>=0){ ROOF=null; ROOFSEL=null; RIDGESEL=null; LINEHOVER=null; roofs=Math.max(roofs,1); }
+    const mArea=ringArea(merged.concat([merged[0]]));
+    /* the old edge lines trace the old outline; the merged outline gets its own */
+    dropLinesAlong(uClean(rings(hf.geometry)[0]));
+    absorbed.forEach(i=>dropLinesAlong(uClean(rings(AREAS[i].geometry)[0])));
+    LINES=LINES.concat([bldEdgeLine(merged,hostToid)]);
+    plotTake(merged);
+    hf.geometry={type:'Polygon',coordinates:[tidy(merged)]};
+    hf.properties=Object.assign({},hf.properties,{Shape_Area:+mArea.toFixed(2),Merged:true,
+                                                  MergedFrom:G.name||'plan',Inner:!!G.inner});
+    absorbed.sort((p,q)=>q-p).forEach(i=>{
+      AREAS.splice(i,1);
+      if(SEL===i) SEL=-1; else if(SEL>i) SEL--;
+      SELSET=new Set([...SELSET].filter(x=>x!==i).map(x=>x>i?x-1:x));
+    });
+    if(SEL<0&&SELSET.size) SEL=Math.min(...SELSET);
+    if(SEL<0&&AREAS.length) SEL=(typeof autoPick==='function')?autoPick():0;
+    G.placedToid=hostToid;
+    if(before) pushRedo('the building you merged',()=>{ applySnapshot(before); });
+    syncDock(); syncPlotItems(); syncRoofPick(); syncHeightUI(); autosaveSoon();
+    return {ok:true,merged:true,mergedInto:hostToid,absorbed:absorbed.length,roofs:roofs,
+            area:mArea,wasArea:wasArea,toid:hostToid,index:AREAS.indexOf(hf)};
+  }
+  const n=AREAS.filter(f=>f&&f.properties&&f.properties.Added).length+1;
+  const toid='added-'+n+'-'+Date.now().toString(36);
+  const f={type:'Feature',
+           properties:{Theme:'Buildings',DescriptiveGroup:'Building',TOID:toid,Added:true,
+                       Name:G.name||'plan',Shape_Area:+area.toFixed(2),
+                       Inner:!!G.inner,SizePct:G.sizePct!=null?G.sizePct:100},
+           geometry:{type:'Polygon',
+                     coordinates:[closed.map(p=>[+p[0].toFixed(3),+p[1].toFixed(3)])]}};
+  AREAS.push(f);
+  LINES=LINES.concat([bldEdgeLine(ring,toid)]);
+  plotTake(ring);
+  G.placedToid=toid;
+  if(before) pushRedo('the building you placed',()=>{ applySnapshot(before); });
+  syncDock(); syncPlotItems(); autosaveSoon();
+  return {ok:true,merged:false,area:area,toid:toid,index:AREAS.length-1};
+}
+/* A BUILDING OFF THE MAP, ROOF AND ALL. The roof is keyed to the building
+   by TOID, so every shape carrying that roof goes with it, and the roof in
+   hand is dropped if it was this one. AREAS is index-keyed by the selection,
+   so the selection is re-pointed rather than left one off. One snapshot on
+   the undo stack puts the lot back. */
+function removeBuildingAt(i){
+  const f=AREAS[i];
+  if(!f||!themeHas(f.properties,'Buildings')) return null;
+  const before=snapshotNow();
+  const toid=f.properties.TOID;
+  let roofs=0;
+  SHAPES=SHAPES.filter(sh=>{ const gone=!!(sh.roof&&sh.roof.toid===toid); if(gone) roofs++; return !gone; });
+  if(ROOF&&ROOF.toid===toid){ ROOF=null; ROOFSEL=null; RIDGESEL=null; LINEHOVER=null; roofs=Math.max(roofs,1); }
+  const bRing=uClean(rings(f.geometry)[0]);
+  const lines=dropLinesAlong(bRing);
+  AREAS.splice(i,1);
+  const fix=x=>x>i?x-1:x;
+  if(SEL===i) SEL=-1; else if(SEL>i) SEL--;
+  SELSET=new Set([...SELSET].filter(x=>x!==i).map(fix));
+  if(SEL<0&&SELSET.size) SEL=Math.min(...SELSET);
+  if(SEL<0&&AREAS.length) SEL=(typeof autoPick==='function')?autoPick():0;
+  const plot=plotGive(bRing);
+  if(before) pushRedo('the building you removed',()=>{ applySnapshot(before); });
+  syncDock(); syncPlotItems(); syncRoofPick(); syncHeightUI(); autosaveSoon();
+  try{ showSel(); }catch(_){}
+  return {toid:toid,area:polyArea(f),roofs:roofs,lines:lines,plot:plot};
+}
+/* SPLIT A BUILDING WITH A LINE (23a). The plot line's own cutter does the
+   geometry -- as drawn first, then run on to reach the outline, the same two
+   readings the plot gets. The first building the line crosses is the one
+   split; the two parts keep its properties under -a and -b TOIDs, so heights
+   and the like survive, and a roof drawn on the whole is dropped and said,
+   because neither part is its outline any more. The cut, trimmed to the two
+   walls it crossed, is laid as a boundary LINE exactly as the plot line lays
+   its own: a building is a fill, MasterMap draws its edges as line features,
+   and without the line the two parts read as one -- the split would be there
+   and invisible. */
+function buildingToCarve(cut){
+  for(let i=0;i<AREAS.length;i++){
+    const f=AREAS[i];
+    if(!f||!themeHas(f.properties,'Buildings')) continue;
+    const r=rings(f.geometry)[0];
+    if(!r||r.length<3) continue;
+    const open=uClean(r);
+    let res=splitRingByPolyline(open,cut);
+    if(res.err) res=splitRingByPolyline(open,reachRing(cut,open));
+    if(!res.err) return {i:i,res:res};
+  }
+  return null;
+}
+function carveBuilding(cut){
+  const found=buildingToCarve(cut);
+  if(!found) return {err:'that line does not cross a building'};
+  const i=found.i, res=found.res, was=AREAS[i];
+  const before=snapshotNow();
+  const toid=was.properties.TOID||'building';
+  const mk=(ring,tag,area)=>({type:'Feature',
+    properties:Object.assign({},was.properties,{TOID:toid+'-'+tag,_carved:true,Shape_Area:+area.toFixed(2)}),
+    geometry:{type:'Polygon',coordinates:[ring.concat([ring[0]]).map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)])]}});
+  let roofs=0;
+  SHAPES=SHAPES.filter(sh=>{ const g2=!!(sh.roof&&sh.roof.toid===toid); if(g2) roofs++; return !g2; });
+  if(ROOF&&ROOF.toid===toid){ ROOF=null; ROOFSEL=null; RIDGESEL=null; LINEHOVER=null; roofs=Math.max(roofs,1); }
+  AREAS.splice(i,1,mk(res.a,'a',res.areaA),mk(res.b,'b',res.areaB));
+  /* a seam through a building is a building edge, in the building's colour */
+  const seam=cutFeature(res.path||cut);
+  seam.properties.DescriptiveGroup='Building'; seam.properties.Theme='Buildings'; seam.properties._bld=toid;
+  LINES=LINES.concat([seam]);
+  /* one feature became two at i: every index above it moved up one */
+  if(SEL>i) SEL++;
+  SELSET=new Set([...SELSET].map(x=>x>i?x+1:x));
+  if(before) pushRedo('the building you split',()=>{ applySnapshot(before); });
+  syncDock(); syncPlotItems(); syncRoofPick(); syncHeightUI(); autosaveSoon();
+  return {ok:true,i:i,toid:toid,areaA:res.areaA,areaB:res.areaB,roofs:roofs};
+}
+function drawBldCut(g,X,Y,k){
+  /* the corners plotted so far, joined, with a handle at each */
+  if(BLDPTS.length){
+    g.save();
+    g.beginPath();
+    BLDPTS.forEach((p,i)=>{ const x=X(p[0],p[1]), y=Y(p[0],p[1]); i?g.lineTo(x,y):g.moveTo(x,y); });
+    g.setLineDash([8*k,6*k]); g.lineWidth=2.2*k; g.strokeStyle='#1c1c1a'; g.stroke(); g.setLineDash([]);
+    BLDPTS.forEach(p=>{ g.beginPath(); g.arc(X(p[0],p[1]),Y(p[0],p[1]),4.5*k,0,7);
+      g.fillStyle='#fff'; g.fill(); g.lineWidth=1.8*k; g.stroke(); });
+    g.restore();
+  }
+  if(!BLDCUT||!BLDCUT.a) return;
+  const ax=X(BLDCUT.a[0],BLDCUT.a[1]), ay=Y(BLDCUT.a[0],BLDCUT.a[1]);
+  const bx=X(BLDCUT.b[0],BLDCUT.b[1]), by=Y(BLDCUT.b[0],BLDCUT.b[1]);
+  g.save();
+  if(BLDCUT.tool==='clearrect'){
+    g.setLineDash([8*k,6*k]); g.lineWidth=2.2*k; g.strokeStyle='#1c1c1a';
+    g.fillStyle='rgba(28,28,26,0.10)';
+    g.beginPath(); g.rect(Math.min(ax,bx),Math.min(ay,by),Math.abs(bx-ax),Math.abs(by-ay)); g.fill(); g.stroke();
+    g.restore(); return;
+  }
+  g.beginPath(); g.moveTo(ax,ay); g.lineTo(bx,by);
+  g.setLineDash([8*k,6*k]); g.lineWidth=2.2*k; g.strokeStyle='#1c1c1a';
+  g.stroke(); g.setLineDash([]);
+  [[ax,ay],[bx,by]].forEach(p=>{ g.beginPath(); g.arc(p[0],p[1],4.5*k,0,7);
+    g.fillStyle='#fff'; g.fill(); g.lineWidth=1.8*k; g.stroke(); });
+  g.restore();
+}
+/* CLEAR A PART OF A BUILDING (24c): the ground inside `region` leaves every
+   building it overlaps and goes back to the plot. Each building's remainder
+   is what the difference says it is -- one piece, several, or nothing --
+   and only if the difference adds up against the union; a building whose
+   difference does not is left as it was. Edges are re-laid for what
+   remains; a roof on it is dropped. */
+function clearBuildingsWith(region){
+  const reg=uClean(region);
+  if(reg.length<3||ringArea(reg.concat([reg[0]]))<0.25) return {err:'the area is too small'};
+  const before=snapshotNow();
+  let touched=0, cleared=0, gone=0, roofs=0;
+  for(let i=AREAS.length-1;i>=0;i--){
+    const f=AREAS[i];
+    if(!f||!themeHas(f.properties,'Buildings')) continue;
+    const ring=uClean(rings(f.geometry)[0]);
+    if(ring.length<3) continue;
+    const u=unionRings(ring,reg);
+    if(!u||u.parts!==1||u.overlap<0.05) continue;
+    const d=diffRings(ring,reg);
+    const expect=uSigned(uCCW(ring))-u.overlap;
+    if(d&&Math.abs(d.area-expect)>0.5+0.02*Math.abs(expect)) continue;   // does not add up
+    const toid=f.properties.TOID;
+    touched++; cleared+=u.overlap;
+    dropLinesAlong(ring);
+    SHAPES=SHAPES.filter(sh=>{ const g2=!!(sh.roof&&sh.roof.toid===toid); if(g2) roofs++; return !g2; });
+    if(ROOF&&ROOF.toid===toid){ ROOF=null; ROOFSEL=null; RIDGESEL=null; LINEHOVER=null; roofs=Math.max(roofs,1); }
+    /* all of its ground back to the plot, then each remainder takes its own */
+    plotGive(ring);
+    const parts=(d&&d.parts.length)?d.parts.filter(p=>uSigned(p.outer)>0.5):[];
+    const feats=parts.map((p,k)=>({type:'Feature',
+      properties:Object.assign({},f.properties,{TOID:toid+(parts.length>1?'-'+String.fromCharCode(97+k):''),
+        Shape_Area:+(uSigned(p.outer)+p.holes.reduce((a,h)=>a+uSigned(h),0)).toFixed(2),_cleared:true}),
+      geometry:{type:'Polygon',coordinates:[closeRing(p.outer)].concat(p.holes.map(closeRing))}}));
+    if(!feats.length) gone++;
+    AREAS.splice(i,1,...feats);
+    const delta=feats.length-1;
+    if(SEL===i) SEL=-1; else if(SEL>i) SEL+=delta;
+    SELSET=new Set([...SELSET].filter(x=>x!==i).map(x=>x>i?x+delta:x));
+    feats.forEach(ff=>{ const rr=uClean(rings(ff.geometry)[0]);
+      LINES=LINES.concat([bldEdgeLine(rr,ff.properties.TOID)]); plotTake(rr);
+      /* a courtyard cleared inside a building is plot too: an island of it */
+      ringsAll(ff.geometry).slice(1).forEach(h=>plotGive(uClean(h))); });
+  }
+  if(!touched) return {err:'that area touches no building'};
+  if(SEL<0&&SELSET.size) SEL=Math.min(...SELSET);
+  if(SEL<0&&AREAS.length) SEL=(typeof autoPick==='function')?autoPick():0;
+  if(before) pushRedo('the part you cleared',()=>{ applySnapshot(before); });
+  syncDock(); syncPlotItems(); syncRoofPick(); syncHeightUI(); autosaveSoon();
+  try{ showSel(); }catch(_){}
+  return {ok:true,touched:touched,area:cleared,gone:gone,roofs:roofs};
+}
+/* a split line that comes back to its first corner is a clear */
+function bldPtsClosed(pts){
+  return pts.length>=4&&Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])<0.5;
+}
+function bldSayCleared(c,how){
+  $('roofHint').textContent='Cleared '+c.area.toFixed(1)+' m² '+how
+    +(c.gone?'; '+c.gone+' building'+(c.gone>1?'s':'')+' gone entirely':'')
+    +(c.roofs?'; a roof is dropped, click the building again in Roof':'')
+    +'. The ground is plot again. Undo puts it back.';
+}
+function setBldTool(t){
+  BLDTOOL=(BLDTOOL===t)?null:t;
+  if(BLDTOOL==='remove') $('roofHint').textContent='Remove building — tap a building to take it off the map.';
+  else if(BLDTOOL==='split') $('roofHint').textContent='Split building — drag a line across a building, or tap corners; back to the first corner clears the inside.';
+  else if(BLDTOOL==='clearrect') $('roofHint').textContent='Clear — drag a box over the part of a building to take away.';
+  else if(BLDTOOL==='clearpoly') $('roofHint').textContent='Clear — tap the corners of the part to take away, then press the button.';
+  else $('roofHint').textContent='Tool put away.';
+  if(BLDTOOL!=='split'&&BLDTOOL!=='clearpoly'){ BLDCUT=null; BLDPTS=[]; }
+  bldSync(); draw();
+}
+/* the row reads the ghost, so it is right whichever panel changed the ghost */
+function bldSync(){
+  const col=$('bldCol');
+  if(!col) return;
+  col.style.display=(MODE==='building')?'':'none';
+  const G=GHOST;
+  if($('bldCal')){ $('bldCal').textContent=($('ghostCal')&&$('ghostCal').textContent)||'Set scale'; $('bldCal').disabled=!G; }
+  if($('bldRot')){
+    /* the turn George has given it, not the bearing it sits at */
+    const r=G?Math.round(wrapDeg((G.rot||0)-(G.rot0||0))):0;
+    $('bldRot').value=String(r); $('bldRotVal').textContent=r+'°'; $('bldRot').disabled=!G;
+  }
+  if($('bldSize')){
+    const pct=(G&&G.sizePct!=null)?G.sizePct:100;
+    $('bldSize').value=String(pct);
+    $('bldSizeVal').textContent=Math.max(BLD_MIN_PCT,pct)+'%';
+    $('bldSize').disabled=!(G&&G.ready);
+  }
+  if($('bldExt')){
+    const inner=!!(G&&G.inner);
+    $('bldExt').style.background=inner?'transparent':'#f1efe8';
+    $('bldInt').style.background=inner?'#f1efe8':'transparent';
+  }
+  if($('bldPlace')) $('bldPlace').disabled=!(G&&G.ready&&G.scaleTrusted&&G.ring&&G.ring.length>=3);
+  if($('bldRemove')) $('bldRemove').style.background=(BLDTOOL==='remove')?'#f1efe8':'transparent';
+  if($('bldSplit')){
+    $('bldSplit').style.background=(BLDTOOL==='split')?'#f1efe8':'transparent';
+    $('bldSplit').textContent=(BLDTOOL==='split'&&BLDPTS.length>=2)
+      ?(bldPtsClosed(BLDPTS)?'Clear inside the line':'Cut along '+BLDPTS.length+' corners'):'Split building';
+  }
+  if($('bldClearRect')) $('bldClearRect').style.background=(BLDTOOL==='clearrect')?'#f1efe8':'transparent';
+  if($('bldClearPoly')){
+    $('bldClearPoly').style.background=(BLDTOOL==='clearpoly')?'#f1efe8':'transparent';
+    $('bldClearPoly').textContent=(BLDTOOL==='clearpoly'&&BLDPTS.length>=3)?('Clear '+BLDPTS.length):'∠';
+  }
+  if($('bldStat')) $('bldStat').textContent=
+    !G?'No plan loaded.'
+    :!G.scaleTrusted?'Scale not set — press Set scale and click two ends of a known distance.'
+    :(G.ring&&G.ring.length>=3)?('Outline traced, '+G.ring.length+' corners'
+        +(G.inner?', pushed out '+BLD_WALL+' m a side for the walls.':'.'))
+    :'No outline could be traced from this plan.';
+}
 function ghostPlaceIfNew(){
   if(!GHOST||GHOST.placed||!GHOST.ready||!VIEW) return;
   const c=screenToMap(canvas.width/2/(VIEW.dpr||1),canvas.height/2/(VIEW.dpr||1));
@@ -15409,7 +17222,7 @@ function ghostPlaceIfNew(){
 
 function snapMetres(){
   const m=VIEW&&VIEW.S?SNAP_PX/VIEW.S:0.3;
-  return Math.min(m,SNAP_MAX);
+  return Math.max(PLOT_SNAP_MIN,Math.min(m,SNAP_MAX));
 }
 /* Every roof's drawn lines, so the OUTLINE tool can catch them as well as the
    ridge tool: an extension wall very often wants to start exactly on the main
@@ -16915,6 +18728,103 @@ function deckCellTile(R,w,PL){
    from hand-drawn ones. Duplicate links are skipped the way the hand path
    skips them, so drawing the same deck twice adds nothing. Returns how many
    links were added; reads ROOF, as ridgeNode does. */
+/* IS LINK i A SIDE OF A RECTANGLE OF FOUR LINKS, and which links are the
+   other three? Deliberately STRICT: adjacent sides square, opposite sides
+   parallel and equal. A deck whose corner has already been pulled out of
+   square is not a rectangle any more and does not offer this gesture -- a
+   side-drag on a trapezium would have to invent a shape, and inventing one
+   is worse than saying no. Returns the four link indices in sides, so the
+   dimensions can be shown for that deck and no other. */
+function deckRectFor(R,i){
+  if(!R||!R.links||!R.links[i]||!R.nodes) return null;
+  const N=R.nodes, L=R.links[i], a=L.a, b=L.b;
+  if(!N[a]||!N[b]) return null;
+  const abx=N[b][0]-N[a][0], aby=N[b][1]-N[a][1], lab=Math.hypot(abx,aby);
+  if(lab<DECK_MIN) return null;
+  const ux=abx/lab, uy=aby/lab;
+  const spurs=(n)=>{
+    const out=[];
+    for(let j=0;j<R.links.length;j++){
+      if(j===i) continue;
+      const l=R.links[j];
+      if(l.a===n) out.push([l.b,j]);
+      else if(l.b===n) out.push([l.a,j]);
+    }
+    return out;
+  };
+  const sb=spurs(b), sa=spurs(a);
+  for(let p=0;p<sb.length;p++) for(let q=0;q<sa.length;q++){
+    const c=sb[p][0], d=sa[q][0];
+    if(c===a||d===b||c===d) continue;
+    if(!N[c]||!N[d]) continue;
+    let opp=-1;
+    for(let j=0;j<R.links.length;j++){
+      if(j===i||j===sb[p][1]||j===sa[q][1]) continue;
+      const l=R.links[j];
+      if((l.a===c&&l.b===d)||(l.a===d&&l.b===c)){ opp=j; break; }
+    }
+    if(opp<0) continue;
+    const bcx=N[c][0]-N[b][0], bcy=N[c][1]-N[b][1], lbc=Math.hypot(bcx,bcy);
+    const adx=N[d][0]-N[a][0], ady=N[d][1]-N[a][1], lad=Math.hypot(adx,ady);
+    if(lbc<DECK_MIN||lad<DECK_MIN) continue;
+    if(Math.abs((bcx*ux+bcy*uy)/lbc)>DECK_SQUARE) continue;   // square to the side
+    if(Math.abs((adx*ux+ady*uy)/lad)>DECK_SQUARE) continue;
+    const dcx=N[c][0]-N[d][0], dcy=N[c][1]-N[d][1], ldc=Math.hypot(dcx,dcy);
+    if(ldc<DECK_MIN) continue;
+    if((dcx*ux+dcy*uy)/ldc<0.995) continue;                   // parallel, same way
+    if(Math.abs(ldc-lab)>Math.max(0.05,0.02*lab)) continue;   // and the same length
+    return {i:i,opp:opp,a:a,b:b,c:c,d:d,sides:[i,sb[p][1],opp,sa[q][1]]};
+  }
+  return null;
+}
+/* Take the side under the pointer in hand. Returns false and touches nothing
+   when the press is not on a rectangle's side, so the caller falls through to
+   whatever it did before -- a pan, a ghost, a plain click. */
+function deckSideGrab(ox,oy){
+  if(MODE!=='roof'||!VIEW||!ROOF||DRAW||OUTEDIT||PLACEMODE||RIDGEMODE||DECKMODE) return false;
+  const [mx,my]=screenToMap(ox,oy);
+  const h=hitAnyLink(mx,my);
+  if(!h) return false;
+  const q=deckRectFor(h.R,h.i);
+  if(!q) return false;
+  activateRoof(h.R);
+  const R=h.R, N=R.nodes;
+  const abx=N[q.b][0]-N[q.a][0], aby=N[q.b][1]-N[q.a][1], lab=Math.hypot(abx,aby)||1;
+  const nx=-aby/lab, ny=abx/lab;
+  /* HOW DEEP THE DECK IS, SIGNED, along that perpendicular. The clamp works on
+     this rather than on the pointer, so the side can be pushed to within half a
+     metre of its opposite number and no further, and can never cross it and
+     turn the rectangle inside out. */
+  const depth=(N[q.d][0]-N[q.a][0])*nx+(N[q.d][1]-N[q.a][1])*ny;
+  DECKSIDE={R:R,q:q,nx:nx,ny:ny,depth:depth,t0:mx*nx+my*ny,
+            from:[N[q.a].slice(),N[q.b].slice()],
+            undo:snapRoof(R),moved:false,px:ox,py:oy};
+  return true;
+}
+/* Both nodes to where the pointer has taken them, ALONG THE PERPENDICULAR
+   ONLY -- movement along the side itself is thrown away, which is what keeps
+   the rectangle a rectangle however the hand wanders. Measured from the
+   positions the side was PICKED UP at, not from the last frame, so a long
+   drag cannot accumulate rounding. */
+function deckSideTo(mx,my){
+  const S=DECKSIDE;
+  if(!S) return;
+  let t=(mx*S.nx+my*S.ny)-S.t0;
+  if(S.depth>0) t=Math.min(t,S.depth-DECK_MIN);
+  else t=Math.max(t,S.depth+DECK_MIN);
+  S.R.nodes[S.q.a]=[S.from[0][0]+S.nx*t, S.from[0][1]+S.ny*t];
+  S.R.nodes[S.q.b]=[S.from[1][0]+S.nx*t, S.from[1][1]+S.ny*t];
+}
+function deckSideSize(S){
+  const N=S.R.nodes, q=S.q;
+  return {w:Math.hypot(N[q.b][0]-N[q.a][0],N[q.b][1]-N[q.a][1]),
+          h:Math.hypot(N[q.d][0]-N[q.a][0],N[q.d][1]-N[q.a][1])};
+}
+function deckSidePut(S){                    // back where it was picked up
+  if(!S) return;
+  S.R.nodes[S.q.a]=S.from[0].slice();
+  S.R.nodes[S.q.b]=S.from[1].slice();
+}
 function deckFromDrag(c){
   if(!ROOF||!c||c.length!==4) return 0;
   const ids=c.map(p=>ridgeNode(p,null));
@@ -17975,10 +19885,34 @@ function inwardSign(pts,w){
 /* The order the type groups are painted in: by the most recent item of each
    type, so the last thing drawn lies on top. Types with nothing on the plot
    keep the old resting order, which is what the gates below read. */
+/* THE RUNS TO PAINT, IN THE ORDER THEY WERE DRAWN (24f).
+   Each run is one type and the consecutive items of it: [{t, items}].
+   22o sorted the five TYPES by their most recent item, so one new square of
+   drive lifted EVERY piece of drive over the path it had been under, and the
+   drive appeared to grow across the plot. Pieces laid together are
+   consecutive, so a run still gathers what needs to merge -- the group is
+   stroked then filled over, which is what hides the seam between two brush
+   strokes of the same thing -- while a piece laid later covers only what it
+   covers. An empty list paints nothing, and a single item is a run of one. */
+function plotPaintRuns(items){
+  const out=[];
+  (items||[]).forEach(it=>{
+    if(!it||!it.type) return;
+    const tail=out[out.length-1];
+    if(tail&&tail.t===it.type) tail.items.push(it);
+    else out.push({t:it.type,items:[it]});
+  });
+  return out;
+}
+/* WHICH TYPE ENDS UP ON TOP when several are drawn -- 22o's rule at the level
+   it still applies. The painter no longer walks this (it walks the runs), but
+   the question 'is a path drawn over a patio on top of it' is still a fact
+   about the drawing and is still answered here: a type's place is its LAST
+   run. The resting order, with nothing drawn, is unchanged. */
 function plotPaintOrder(items){
   const base=['drive','path','patio','deck','hedge'];
-  const last={};
-  (items||[]).forEach((it,i)=>{ if(it&&it.type) last[it.type]=i; });
+  const runs=plotPaintRuns(items), last={};
+  runs.forEach((r,i)=>{ last[r.t]=i; });
   return base.slice().sort((a,b)=>{
     const la=(last[a]==null?-1:last[a]), lb=(last[b]==null?-1:last[b]);
     return (la!==lb)?la-lb:(base.indexOf(a)-base.indexOf(b));
@@ -18435,11 +20369,19 @@ function drawLinkLengths(g,X,Y,k){
   if(MODE!=='roof'||!ROOF||!ROOF.links||!ROOF.links.length||!ROOF.nodes) return;
   /* ONLY WHILE A RIDGE IS BEING DRAWN (22o): that is when a length is being
      decided. On all the time they were clutter over every roof. */
-  if(!RIDGEMODE&&!(typeof RD!=='undefined'&&RD)) return;
+  /* AND WHILE A DECK SIDE IS BEING PULLED (22w), on the same rule: a length
+     shows while it is being decided. Only the four sides of THAT rectangle --
+     the rest of the roof's lines are not being decided and would be clutter
+     over the very deck being sized. */
+  const dside=(typeof DECKSIDE!=='undefined')?DECKSIDE:null;
+  const only=(dside&&dside.R===ROOF&&dside.q)?dside.q.sides:null;
+  if(!RIDGEMODE&&!(typeof RD!=='undefined'&&RD)&&!only) return;
   g.save();
   g.font=(10*k)+'px ui-monospace,Menlo,monospace';
   g.textAlign='center'; g.textBaseline='middle';
-  for(const L of ROOF.links){
+  for(let li=0;li<ROOF.links.length;li++){
+    const L=ROOF.links[li];
+    if(only&&only.indexOf(li)<0) continue;
     const a=ROOF.nodes[L.a], b=ROOF.nodes[L.b];
     if(!a||!b) continue;
     const len=Math.hypot(b[0]-a[0],b[1]-a[1]);
@@ -18876,7 +20818,9 @@ function lineChipAt(i){
   const hip=isHip(L);
   $('linechiplab').textContent=hip?'hip / valley':'ridge';
   $('linechiplab').style.color=hip?C_HIP:ridgeColour(null);
-  $('linechipact').textContent='double-click to make '+(hip?'ridge':'hip / valley');
+  /* and, on a deck's side, the gesture that is not otherwise discoverable */
+  $('linechipact').textContent='double-click to make '+(hip?'ridge':'hip / valley')
+    +(deckRectFor(ROOF,i)?' · drag to resize the deck':'');
   chip.style.display='flex';
 }
 function clearLineHover(){
@@ -18937,8 +20881,14 @@ function roofReport(){
     if(inf.length) s+='  gable inferred on edge '+inf.join(', ')
       +' — a ridge ends there\n';
     F.forEach(f=>{ tp+=f.plan_m2; tt+=f.true_m2;
-      s+='  edge '+f.edge+'  plan '+f.plan_m2.toFixed(1)+' m²  on slope '
-        +f.true_m2.toFixed(1)+' m²  facing '+f.aspect.toFixed(0)+'°\n'; });
+      /* THE DECK'S FLAT MIDDLE HAS NO ASPECT. roofFacets reports it as edge
+         -1 with aspect null, and toFixed on that threw and took the whole
+         panel with it, on every redraw, from the moment a deck existed. A
+         flat facet is DESCRIBED, not measured for a direction it does not
+         have. */
+      s+='  '+(f.edge<0?'deck   ':'edge '+f.edge)+'  plan '+f.plan_m2.toFixed(1)+' m²  on slope '
+        +f.true_m2.toFixed(1)+' m²  '
+        +(f.aspect==null?'flat':'facing '+f.aspect.toFixed(0)+'°')+'\n'; });
     s+='  total plan '+tp.toFixed(1)+' m²  on slope '+tt.toFixed(1)+' m²\n';
     const gap=Math.abs(tp-ROOF.area)/Math.max(ROOF.area,0.01);
     if(gap>0.02) s+='!! planes cover '+(tp/ROOF.area*100).toFixed(0)
@@ -25079,6 +27029,11 @@ $('itRot').oninput=()=>itemEdit(it=>{
 $('itRotSq').onclick=()=>itemEdit(it=>{
   it.rot=alignRotAt(ROOF,it.type,it.x,it.y);
 });
+/* A QUARTER TURN (24y), on the undo stack like every other change here --
+   the same road the solar array's own flip takes. */
+if($('itRot90')) $('itRot90').onclick=()=>itemEdit(it=>{
+  it.rot=(((it.rot||0)+90)%360+360)%360;
+});
 /* Percentage on the control, metres on the item -- see the editor's bind.
    Reading it back as a percentage keeps the slider where the user left it
    when the projection is changed afterwards. */
@@ -25116,10 +27071,15 @@ $('ghostFile').onchange=function(){
   };
   rd.readAsDataURL(f);
 };
+const GHOST_IMPORT_PX=2600;
 function ghostBegin(img,name){
-  /* bounded once at import: the OCR pass reads at 1800 px anyway, and the
-     session embeds this same picture, so bigger buys nothing */
-  const k=Math.min(1,1800/Math.max(img.width,img.height));
+  /* bounded once at import. 1800 was the OCR's figure, and 'the session
+     embeds this same picture, so bigger buys nothing' -- wrong about the
+     TRACER, which needs the door arcs to reach the wall stubs they nearly
+     touch: on George's sheet the seal held from about 2200 px up and failed
+     below (24a). 2600 is that with headroom; the region a sheet yields is
+     far smaller than the sheet, so this is about twice the pixels, not four. */
+  const k=Math.min(1,GHOST_IMPORT_PX/Math.max(img.width,img.height));
   const c=document.createElement('canvas');
   c.width=Math.max(2,Math.round(img.width*k));
   c.height=Math.max(2,Math.round(img.height*k));
@@ -25270,6 +27230,8 @@ function ghostCalClick(mx,my){
   }
   if(isFinite(m)&&m>0&&px>2){
     GHOST.ppm=px/m; GHOST.ready=true; GHOST.scaleTrusted=true;
+    GHOST.ppm0=GHOST.ppm; GHOST.sizePct=100;      // Size is measured against THIS (22y)
+    if(typeof bldSync==='function') bldSync();
     if(window.RoofGhost&&RoofGhost.FP&&RoofGhost.FP.plan){
       RoofGhost.FP.plan.pxPerM=GHOST.ppm;
       RoofGhost.FP.planScaleSrc='calibrated';
@@ -25663,6 +27625,8 @@ function syncSun(){
   $('sunReset').disabled=!SUNDIAL.on;
   const sh=$('shadowOn');
   if(sh) sh.checked=SHADOW.on;
+  const si=$('shadowItems');
+  if(si) si.checked=SHADOW.items;
 }
 let SUNWAS=null;
 function sunGrab(){
@@ -25718,8 +27682,15 @@ $('shadowOn').onchange=()=>{
   SHADOW.on=$('shadowOn').checked;
   $('roofHint').textContent=SHADOW.on
     ? 'The roofs throw a shadow on the plot. It follows the sun, and it is on the sheet.'
-    : 'Ground shadow off.';
+    : 'Building shadow off.';
   syncSun(); draw();
+};
+if($('shadowItems')) $('shadowItems').onchange=()=>{
+  SHADOW.items=$('shadowItems').checked;
+  $('roofHint').textContent=SHADOW.items
+    ? 'The drive, paths and patios stand a little proud and throw onto the plot.'
+    : 'Plot item shadow off.';
+  draw();
 };
 /* Covering choices: the measured sheet first, then everything the kit knows.
    Stored on the roof in hand, so a main and an extension can differ. */
@@ -26632,10 +28603,84 @@ function setMode(m){
   syncItems(); syncRoofPick(); syncPlotItems(); syncRoofItemList();
   $('modePlot').style.background=m==='plot'?'#f1efe8':'transparent';
   $('modeRoof').style.background=m==='roof'?'#f1efe8':'transparent';
+  if($('modeBuilding')) $('modeBuilding').style.background=m==='building'?'#f1efe8':'transparent';
+  /* the tap-tool stands down on the way out of building mode, like SELADD */
+  if(m!=='building'){ BLDTOOL=null; BLDPTS=[]; BLDCUT=null; }
+  bldSync();
+  if(m==='building') $('roofHint').textContent=GHOST
+    ?'Building — drag the plan into place, Turn to rotate, then Place building.'
+    :'Building — Upload plan, Set scale, drag it into place, then Place building.';
   draw();
 }
 $('modePlot').onclick=()=>setMode('plot');
 $('modeRoof').onclick=()=>setMode('roof');
+$('modeBuilding').onclick=()=>setMode('building');
+$('bldLoad').onclick=()=>$('ghostFile').click();
+$('bldCal').onclick=()=>{ const c=$('ghostCal'); if(c&&c.onclick) c.onclick.call(c); bldSync(); };
+$('bldRot').addEventListener('input',function(){
+  ghostSetRot(wrapDeg(((GHOST&&GHOST.rot0)||0)+(+this.value||0)));
+  bldSync();
+});
+$('bldExt').onclick=()=>{ if(GHOST) GHOST.inner=false; bldSync(); draw(); };
+$('bldInt').onclick=()=>{ if(GHOST) GHOST.inner=true; bldSync(); draw(); };
+/* SIZE IS AGAINST THE CALIBRATED SCALE, not against the last nudge: ppm0 is
+   what Set scale gave, and every slider position is a fraction of that, so
+   sliding out and back lands exactly where it started. */
+$('bldSize').oninput=function(){
+  if(!GHOST||!GHOST.ready) return;
+  if(!(GHOST.ppm0>0)) GHOST.ppm0=GHOST.ppm;
+  const pct=Math.max(0,Math.min(200,Math.round(+this.value||0)));
+  GHOST.sizePct=pct;
+  GHOST.ppm=GHOST.ppm0/(Math.max(BLD_MIN_PCT,pct)/100);
+  bldSync(); draw();
+};
+$('bldRemove').onclick=()=>setBldTool('remove');
+$('bldClearRect').onclick=()=>setBldTool('clearrect');
+$('bldClearPoly').onclick=()=>{
+  if(BLDTOOL==='clearpoly'&&BLDPTS.length>=3){
+    const pts=BLDPTS.slice(); BLDPTS=[];
+    const c=clearBuildingsWith(pts);
+    if(c.err){ $('roofHint').textContent='Not cleared — '+c.err+'.'; bldSync(); draw(); return; }
+    bldSayCleared(c,'inside the corners'); bldSync(); draw(); return;
+  }
+  setBldTool('clearpoly');
+};
+$('bldSplit').onclick=()=>{
+  /* with corners plotted, the button IS the cut */
+  if(BLDTOOL==='split'&&BLDPTS.length>=2){
+    const pts=BLDPTS.slice(); BLDPTS=[];
+    if(bldPtsClosed(pts)){
+      const c=clearBuildingsWith(pts.slice(0,-1));
+      if(c.err){ $('roofHint').textContent='Not cleared — '+c.err+'.'; bldSync(); draw(); return; }
+      bldSayCleared(c,'inside the line'); bldSync(); draw(); return;
+    }
+    const cut=carveBuilding(pts);
+    if(cut.err){ $('roofHint').textContent='Not split — '+cut.err+'.'; bldSync(); draw(); return; }
+    $('roofHint').textContent='Split into '+cut.areaA.toFixed(1)+' and '+cut.areaB.toFixed(1)+' m² along '
+      +pts.length+' corners'+(cut.roofs?'; its roof is dropped, click each part in Roof':'')
+      +'. Remove building takes either part off.';
+    bldSync(); draw(); return;
+  }
+  setBldTool('split');
+};
+$('bldPlace').onclick=()=>{
+  const r=placeBuilding();
+  if(r.err){ $('roofHint').textContent='Not placed — '+r.err+'.'; bldSync(); return; }
+  /* THE BUILDING IS THE SHAPE NOW: the plan picture comes down (24c) */
+  if(GHOST){ GHOST.show=false; try{ ghostSyncPanel(); }catch(_){} }
+  try{ showSel(); }catch(_){}
+  bldSync(); draw();
+  const took=(PLOT_TOOK.i>=0&&PLOT_TOOK.was>0&&PLOT_TOOK.took>0.5*PLOT_TOOK.was)
+    ?(' It took '+PLOT_TOOK.took.toFixed(1)+' of the '+PLOT_TOOK.was.toFixed(1)+' m² the plot had — Undo if that is not where the plan sits.'):'';
+  $('roofHint').textContent=(r.merged
+    ?('Merged into the building on the map — '+r.wasArea.toFixed(1)+' m² becomes '+r.area.toFixed(1)+' m²'
+      +(Math.abs(r.area-r.wasArea)<0.5?' (the plan matched what was there)':'')
+      +(r.absorbed?' with '+r.absorbed+' more taken in':'')
+      +(r.roofs?'. Its roof outline is out of date: switch to Roof and click it again.'
+               :'. Switch to Roof and click it to give it a roof.'))
+    :('Building placed, '+r.area.toFixed(1)+' m². '
+      +'Switch to Roof and click it to give it a roof.'))+took;
+};
 /* Ridge mode swallows clicks on the roof, so anything else that wants them has
    to be able to switch it off. It used to be togglable only by its own button,
    which left no way back to the edge and outline tools once it was on. */
@@ -26976,9 +29021,16 @@ function sessionPayload(){
            a:[+it.a[0].toFixed(3),+it.a[1].toFixed(3)],
            b:[+it.b[0].toFixed(3),+it.b[1].toFixed(3)],
            into:[+it.into[0].toFixed(6),+it.into[1].toFixed(6)]}
-        : {type:it.type,
-           rings:(it.rings||(it.ring?[it.ring]:[])).map(r=>r.map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]))
-          })),
+        /* A ONE-RING ITEM KEEPS ITS `ring` (25b). Written as `rings` it came
+           back as a one-ring `rings` item, and the reshaper only offers
+           handles to `ring` -- so a save, a reload, or an undo-then-redo
+           (redo restores a snapshot, the same road) took every corner away. */
+        : (it.ring&&!it.rings
+           ? {type:it.type,
+              ring:it.ring.map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)])}
+           : {type:it.type,
+              rings:(it.rings||[]).map(r=>r.map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]))}
+          ))),
       mask:{style:MASKSTYLE, shape:MASKSHAPE, brush:MASKBRUSH,
             strokes:MASK.map(m=>({...m}))}
     },
@@ -27023,6 +29075,7 @@ function restoreSession(j){
       cx:+gh.cx||0, cy:+gh.cy||0, show:gh.show!==false,
       opacity:(gh.opacity==null?0.45:+gh.opacity), name:gh.name||'plan',
       locked:!!gh.locked,
+      rot0:+gh.rot||0,                             // it has arrived: keep its turn (24b)
       dataUrl:gh.img, img:null, region:null, ring:[], segs:[],
       placed:true, ready:false};
     const im=new Image();
@@ -27067,7 +29120,7 @@ function restoreSession(j){
   PLOTITEMS=(S.plotItems||[]).map(it=>(it.type==='access'&&it.a&&it.b
     ? {type:'access', a:it.a.slice(), b:it.b.slice(),
        into:(it.into||[0,1]).slice()}
-    : {type:it.type, rings:(it.rings||[]).map(r=>r.map(q=>q.slice()))}));
+    : vtxRestoreShape(it)));
   if(S.road){ setRoadName(S.road.name||''); ROADNUDGE=S.road.nudge?S.road.nudge.slice():null;
               setRoadRot(S.road.rot||0); syncRoadTurn(); }
   if(S.mask){
@@ -27214,7 +29267,7 @@ $('importFile').onchange=e=>{
       else autoOrient();
       ZOOM=1;PANX=0;PANY=0; draw(); showSel(); showZoom();
       $('exportAll').disabled=false; $('exportPng').disabled=false;
-      $('autoRot').disabled=false; $('northUp').disabled=false; $('modeRoof').disabled=false; $('modeRoof').disabled=false;
+      $('autoRot').disabled=false; $('northUp').disabled=false; $('modeRoof').disabled=false; $('modeBuilding').disabled=false; $('modeRoof').disabled=false;
       syncPlotItems(); syncItems(); syncRoofPick(); syncRoofItemList(); roofReport();
       const drawn=hadSession
         ? ('\n'+SHAPES.length+' roof outline'+(SHAPES.length===1?'':'s')+', '
@@ -27299,7 +29352,200 @@ let drag=null;
    every finger has lifted. */
 const FINGERS=new Map();
 let PINCH=null;
+/* EVERYTHING DRAWN ON A MAP, for when the map is replaced (24e). Not the
+   settings -- the road name, the brush, the sun, the hotkeys are the
+   assessor's, not the plot's -- and not the plan, which is a document he may
+   be about to place on the new map. */
+function clearDrawnWork(){
+  PLOTITEMS=[]; SHAPES=[]; ROOF=null; ROOFSEL=null; RIDGESEL=null; LINEHOVER=null;
+  RULERS=[]; DRAW=null; SEL=-1; SELSET=new Set();
+  if(typeof PLOTMODE!=='undefined'){ PLOTMODE=null; PLOTPLACE=null; PLOTPAINT=null; }
+  if(typeof ERASEMODE!=='undefined'){ ERASEMODE=null; ERASEDRAG=null; }
+  if(typeof LINECUT!=='undefined') LINECUT=null;
+  if(typeof BLDTOOL!=='undefined'){ BLDTOOL=null; BLDCUT=null; BLDPTS=[]; }
+  if(typeof VTXOPEN!=='undefined') VTXOPEN=null;
+  if(typeof ACCESSMODE!=='undefined'){ ACCESSMODE=false; ACCESSPLACE=null; ACCESSHOVER=null; }
+  clearRedo();
+  try{ syncPlotItems(); syncRoofPick(); syncHeightUI(); syncRuler(); }catch(_){}
+}
+/* READ AN ITEM'S SHAPE BACK (25b). A `ring` stays a ring, so it keeps its
+   corner handles. A one-ring `rings` -- which is how every session written
+   before this build stored a box -- is folded back to `ring`, so old saves
+   come back reshapable too. Anything with more than one ring is a painted
+   run and stays as it is. */
+function vtxRestoreShape(it){
+  const rs=(it.rings||[]).map(r=>r.map(q=>q.slice()));
+  if(it.ring&&it.ring.length>=3) return {type:it.type, ring:it.ring.map(q=>q.slice())};
+  if(rs.length===1&&rs[0].length>=3) return {type:it.type, ring:rs[0]};
+  return {type:it.type, rings:rs};
+}
+/* THE INTERIOR ANGLE at corner i of a ring, in degrees (25a). Measured inside
+   the shape, so a notch reads over 180 and a square corner reads 90. */
+function vtxAngle(r,i){
+  const n=r.length;
+  if(n<3) return null;
+  const p=r[i], a=r[(i-1+n)%n], b=r[(i+1)%n];
+  const a1=Math.atan2(a[1]-p[1],a[0]-p[0]), a2=Math.atan2(b[1]-p[1],b[0]-p[0]);
+  let d=(a2-a1)*180/Math.PI;
+  while(d<0) d+=360; while(d>=360) d-=360;
+  /* WHICH SIDE IS THE INSIDE. The turn above is measured one way round; the
+     interior angle is either it or 360 less it, depending how the ring is
+     wound. Rather than trust a sign convention, ask the shape: the interior
+     angles of any simple polygon sum to (n-2)*180, and only one of the two
+     readings does. Self-correcting, and it cannot be caught out by a ring
+     handed in either winding. */
+  let sum=0;
+  for(let k=0;k<n;k++){
+    const q=r[k], u=r[(k-1+n)%n], v=r[(k+1)%n];
+    const b1=Math.atan2(u[1]-q[1],u[0]-q[0]), b2=Math.atan2(v[1]-q[1],v[0]-q[0]);
+    let e=(b2-b1)*180/Math.PI;
+    while(e<0) e+=360; while(e>=360) e-=360;
+    sum+=e;
+  }
+  const want=(n-2)*180;
+  return (Math.abs(sum-want)<Math.abs((360*n-sum)-want))?d:360-d;
+}
+/* SQUARE SNAP (25a). With the corner at p and its two neighbours fixed, if the
+   angle at p is within ANG_SNAP of 90 put it exactly on 90 -- swinging the
+   SHORTER arm about p's far neighbour so the corner moves as little as it can.
+   Returns the moved point, or p unchanged. */
+function vtxSquare(r,i,p){
+  const n=r.length;
+  if(n<3) return p;
+  const a=r[(i-1+n)%n], b=r[(i+1)%n];
+  const test=r.map((q,k)=>k===i?p:q);
+  const ang=vtxAngle(test,i);
+  /* 90 OR 270 (25g): a reflex corner squares up the same way */
+  if(ang==null||Math.min(Math.abs(ang-90),Math.abs(ang-270))>ANG_SNAP) return p;
+  /* keep the LONGER arm's direction and put the shorter arm square to it */
+  const va=[a[0]-p[0],a[1]-p[1]], vb=[b[0]-p[0],b[1]-p[1]];
+  const la=Math.hypot(va[0],va[1]), lb=Math.hypot(vb[0],vb[1]);
+  if(!(la>1e-9&&lb>1e-9)) return p;
+  const keep=(la>=lb)?a:b, move=(la>=lb)?b:a;   // p slides along keep's line
+  const kx=p[0]-keep[0], ky=p[1]-keep[1];
+  const kl=Math.hypot(kx,ky) || 1;
+  const ux=kx/kl, uy=ky/kl;                     // keep -> p
+  /* p must sit where (move -> p) is square to (keep -> p): project move onto
+     the line through keep along u, and p is that foot plus the arm it had */
+  const t=(move[0]-keep[0])*ux+(move[1]-keep[1])*uy;
+  return [keep[0]+ux*t, keep[1]+uy*t];
+}
+/* the items that can be reshaped: one ring, three corners or more */
+function vtxItems(){
+  return PLOTITEMS.filter(it=>it&&it.ring&&it.ring.length>=3&&!it.rings);
+}
+/* what is under a press: a corner first, then an edge */
+function vtxHit(ox,oy){
+  let best=null;
+  for(const h of VTXHITS){
+    const d=Math.hypot(h.x-ox,h.y-oy);
+    if(d<=VTX_R&&(!best||d<best.d)) best={kind:'vtx',it:h.it,i:h.i,d:d};
+  }
+  if(best) return best;
+  if(!VIEW) return null;
+  for(const it of vtxItems()){
+    const r=it.ring;
+    for(let i=0;i<r.length;i++){
+      const a=r[i], b=r[(i+1)%r.length];
+      const ax=X0s(a[0],a[1]), ay=Y0s(a[0],a[1]), bx=X0s(b[0],b[1]), by=Y0s(b[0],b[1]);
+      const dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy;
+      if(L2<1) continue;
+      let t=((ox-ax)*dx+(oy-ay)*dy)/L2; t=Math.max(0,Math.min(1,t));
+      const d=Math.hypot(ox-(ax+t*dx),oy-(ay+t*dy));
+      if(d<=VTX_EDGE&&(!best||d<best.d)) best={kind:'edge',it:it,i:i,t:t,d:d};
+    }
+  }
+  return best;
+}
+/* SNAP a point to the other items' corners and edges and to the plot's
+   boundary; the item in hand is left out so it cannot snap to itself */
+function vtxSnap(p,self){
+  let best=null, bd=VTX_SNAP;
+  const rings=[];
+  for(const it of PLOTITEMS){
+    if(!it||it===self) continue;
+    for(const r of (it.rings||(it.ring?[it.ring]:[]))) if(r&&r.length>=3) rings.push(r.concat([r[0]]));
+  }
+  for(const r of plotClipRings()) rings.push(r.concat([r[0]]));
+  for(const r of rings){
+    for(const q of r){ const d=Math.hypot(q[0]-p[0],q[1]-p[1]); if(d<bd){ bd=d; best=[q[0],q[1]]; } }
+  }
+  if(best) return best;
+  for(const r of rings){
+    const sp=ringSpot(p,r);
+    if(sp&&sp.d<bd){ bd=sp.d; best=[sp.q[0],sp.q[1]]; }
+  }
+  return best||p;
+}
+/* DROP THE FLAT CORNERS (25c). A corner within FLAT_ANG of 180 has its two
+   neighbours in line with it: it adds nothing to the shape, splits one
+   measurement into two, and shows a pointless 180 on the drawing. Pulling a
+   whole side leaves exactly these -- 24z leaves a corner behind at each end
+   of a pulled edge so a BAY comes out square-sided, and when the whole side
+   moves those stubs land flat. A bay's own corners are at 90 and stay.
+   Three corners are always kept; there is no shape below that. */
+function vtxDropFlat(ring){
+  let r=ring.map(q=>q.slice());
+  /* DUPLICATES FIRST (25d): two corners on the same spot make vtxAngle
+     meaningless, so they go before any angle is asked for. */
+  for(let guard=0;guard<r.length*2&&r.length>3;guard++){
+    let cut=-1;
+    for(let i=0;i<r.length;i++){
+      const b=r[(i+1)%r.length];
+      if(Math.hypot(b[0]-r[i][0],b[1]-r[i][1])<=VTX_WELD/3){ cut=(i+1)%r.length; break; }
+    }
+    if(cut<0) break;
+    r.splice(cut,1);
+  }
+  /* THEN THE CORNERS THAT ENCLOSE NOTHING. Flat, at 180: the neighbours are
+     in line and the corner only splits a side's measurement in two. SPIKE,
+     at 0 or 360: the ring doubles back on itself, both edges leaving the
+     corner the same way -- which is what a pull PAST its neighbours leaves
+     behind, and what 25c's flat-only test walked straight past (25d). */
+  for(let guard=0;guard<r.length*2&&r.length>3;guard++){
+    let cut=-1;
+    for(let i=0;i<r.length;i++){
+      const a=vtxAngle(r,i);
+      if(a==null) continue;
+      const flat=Math.abs(a-180)<=FLAT_ANG;
+      const spike=(a<=FLAT_ANG)||(a>=360-FLAT_ANG);
+      if(flat||spike){ cut=i; break; }
+    }
+    if(cut<0) break;
+    r.splice(cut,1);
+  }
+  return r;
+}
+/* a landed reshape is one Undo, and the sheet knows */
+function vtxCommit(it,was,what,tidy){
+  /* ONLY AFTER A PULLED EDGE (25c). A corner added by a double-tap sits FLAT
+     on the edge by design -- that is how George marks out the ends of a bay
+     before pulling between them -- so tidying every commit would delete it
+     the instant he lifted his finger. The stubs only arise from a pull, and
+     that is the only commit that tidies. */
+  if(tidy) it.ring=vtxDropFlat(it.ring);
+  const now=it.ring.map(q=>q.slice());
+  if(JSON.stringify(now)===JSON.stringify(was)) return;
+  pushRedo(what,()=>{ it.ring=was.map(q=>q.slice()); draw(); });
+  autosaveSoon();
+  ptSay('Reshaped.','Undo puts it back. Double-tap an edge to add a corner; drag an edge to pull it square.');
+}
 function retractGesture(){
+  /* A CANCELLED TOUCH KEEPS WHAT IT MOVED (25e). Safari takes a touch away
+     whenever it likes -- this file learnt that in 24d -- and putting the ring
+     back recorded NOTHING, so a finished drag could vanish with no undo step
+     to show for it. A gesture that moved is committed, exactly as a release
+     would; only one that never moved is put back. */
+  if(VTX){
+    const g0=VTX; VTX=null;
+    if(g0.moved) vtxCommit(g0.it,g0.was,'the corner you moved',false);
+    else g0.it.ring=g0.was.map(q=>q.slice());
+  }
+  if(EDGE){
+    const g0=EDGE; EDGE=null;
+    if(g0.moved) vtxCommit(g0.it,g0.was,'the edge you pulled',true);
+    else g0.it.ring=g0.was.map(q=>q.slice());
+  }
   /* everything a single finger can have started, put down without landing */
   PLOTPAINT=null; PLOTPLACE=null; ERASEDRAG=null;
   if(LINECUT) LINECUT={a:null,b:null};
@@ -27312,6 +29558,10 @@ function retractGesture(){
   if(typeof ITEMDRAG!=='undefined') ITEMDRAG=null;
   if(typeof RINGDRAG!=='undefined') RINGDRAG=null;
   if(typeof RULERDRAG!=='undefined') RULERDRAG=null;
+  /* a deck side put back down where it was picked up (22w) */
+  if(typeof DECKSIDE!=='undefined'){ deckSidePut(DECKSIDE); DECKSIDE=null; }
+  if(typeof BLDCUT!=='undefined') BLDCUT=null;
+  if(typeof BLDPTS!=='undefined') BLDPTS=[];
   drag=null;
 }
 function pinchFrom(){
@@ -27457,6 +29707,51 @@ canvas.addEventListener('pointerdown',e=>{
      the drag block meant a locked plan silently ate both clicks. */
   /* (the calibration branch that stood here moved to the top of the handler
      in 21y, so it is reached in any mode) */
+  /* A LAID DECK'S SIDE, BEFORE THE GHOST AND BEFORE THE PAN (22w). A press on
+     a rectangle's side takes that side in hand; a press anywhere else is still
+     a pan, and a TAP on the side still selects the line, which is what it did
+     before this gesture existed -- see the pointerup below, which has to do
+     that itself now the press is captured. An ITEM under the finger wins: the
+     ghost block below tests the same way, for the same reason. */
+  if(MODE==='roof'&&VIEW&&node==null){
+    const [dmx,dmy]=screenToMap(ox,oy);
+    const onIt=ROOF&&ROOF.items&&ROOF.items.length
+      &&itemHit(ROOF.items,dmx,dmy,ROOF.flat?0:(ROOF.pitch||30))>=0;
+    if(!onIt&&deckSideGrab(ox,oy)){
+      DECKSIDE.pid=e.pointerId;                                        // 24e
+      try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+      $('roofHint').textContent='Deck side in hand — drag it to resize the deck.';
+      draw(); return;
+    }
+  }
+  /* BUILDING MODE'S PRESS (22y). Remove armed: a tap on a building takes it
+     off, a tap on nothing says so. Otherwise a press on the plan carries it,
+     and anything else pans, which is all this mode has to do with the map. */
+  if(MODE==='building'&&VIEW){
+    const [bmx,bmy]=screenToMap(ox,oy);
+    if(BLDTOOL==='split'||BLDTOOL==='clearrect'||BLDTOOL==='clearpoly'){
+      BLDCUT={a:[bmx,bmy],b:[bmx,bmy],px:ox,py:oy,tool:BLDTOOL,pid:e.pointerId};
+      try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+      draw(); return;
+    }
+    if(BLDTOOL==='remove'){
+      const bi=buildingAt(bmx,bmy);
+      const r=(bi>=0)?removeBuildingAt(bi):null;
+      if(r){
+        $('roofHint').textContent='Building removed, '+r.area.toFixed(1)+' m²'
+          +(r.roofs?' and its roof':'')+'. Undo puts it back.';
+        bldSync(); draw(); return;
+      }
+      $('roofHint').textContent='No building there — tap one, or press Remove building to stand down.';
+      return;
+    }
+    if(GHOST&&!GHOST.locked&&ghostHit(bmx,bmy)){
+      GHOSTDRAG={dx:GHOST.x-bmx, dy:GHOST.y-bmy};
+      try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+      $('roofHint').textContent='Plan in hand — drag it over the plot, Turn to rotate, then Place building.';
+      draw(); return;
+    }
+  }
   if(MODE==='roof'&&VIEW&&node==null&&GHOST&&!GHOST.locked
      &&(SELMODE||(!DRAW&&!PLACEMODE&&!RIDGEMODE))){
     /* the Select tool always carries the ghost; with every drawing hand idle
@@ -27497,14 +29792,33 @@ canvas.addEventListener('pointerdown',e=>{
     accessClick([amx,amy]);
     draw(); return;
   }
-  if(MODE==='plot'&&VIEW&&!ERASEMODE){
-    /* the deck's own turn arrow (22n): a press on it turns that area */
+  /* THE ARROW YIELDS TO EVERY TOOL BUT DECKING (24t). 24e stood it aside for
+     any armed tool, since it sits where a finger goes to draw on a deck --
+     right for a patio tool, wrong for the DECKING tool, which is exactly when
+     George is thinking about which way the boards run. */
+  if(MODE==='plot'&&VIEW&&!ERASEMODE&&!LINECUT
+     &&(!PLOTMODE||PLOTMODE==='deck')
+     &&!(DRAW&&isPlotPen(DRAW.kind))){
+    /* THE DECK'S OWN TURN ARROW (22n), AND ONLY WITH AN IDLE HAND (24e).
+       It sits in the middle of a deck, which is where a finger goes to start
+       drawing something ON that deck; at 9 px that rarely collided, and
+       making it findable at 14 px turned every such press into a board turn.
+       An armed tool wins: the arrow is chrome, and chrome yields. */
     const dk=deckTurnHit(ox,oy);
     if(dk){
-      const was=dk.turn;
-      pushRedo('the boards you turned',()=>{ dk.turn=was; });
-      dk.turn=!deckTurned(dk);
+      /* the arrow's whole group turns together (24o) */
+      const hit=DECKHITS.find(h=>h.it===dk);
+      const group=(hit&&hit.items)?hit.items:[dk];
+      const was=group.map(it=>it.turn);
+      pushRedo('the boards you turned',()=>{ group.forEach((it,i)=>{ it.turn=was[i]; }); });
+      const to=!deckTurned(dk);
+      group.forEach(it=>{ it.turn=to; });
       ptSay('Boards turned on that decking.','Press the arrow again to turn them back.');
+      /* CONSUMED (24t). There are two pointerdown listeners on the canvas; a
+         bare `return` left the first and the second still ran, starting a pan
+         or a tap -- the view jogging under George's finger as he pressed. */
+      try{ e.preventDefault(); }catch(_){}
+      try{ e.stopImmediatePropagation(); }catch(_){}
       draw(); return;
     }
   }
@@ -27535,19 +29849,19 @@ canvas.addEventListener('pointerdown',e=>{
   if(MODE==='plot'&&ERASEMODE==='rect'){
     const [mx,my]=screenToMap(ox,oy);
     const a=snapRectPt([mx,my]).pt;
-    ERASEDRAG={g:'rect',a:a,b:a.slice()};
+    ERASEDRAG={g:'rect',a:a,b:a.slice(),pid:e.pointerId};
     try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
     draw(); return;
   }
   if(MODE==='plot'&&ERASEMODE==='brush'){
     const [mx,my]=screenToMap(ox,oy);
-    ERASEDRAG={g:'brush',pts:[[mx,my]]};
+    ERASEDRAG={g:'brush',pts:[[mx,my]],pid:e.pointerId};
     try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
     draw(); return;
   }
   if(MODE==='plot'&&PLOTMODE&&SEL>=0&&PLOTTOOL==='brush'){
     const [mx,my]=screenToMap(ox,oy);
-    PLOTPAINT={t:PLOTMODE,w:BRUSH_W[PLOTMODE]||0.6,pts:[[mx,my]]};
+    PLOTPAINT={t:PLOTMODE,w:BRUSH_W[PLOTMODE]||0.6,pts:[[mx,my]],pid:e.pointerId};
     try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
     draw(); return;
   }
@@ -27559,7 +29873,7 @@ canvas.addEventListener('pointerdown',e=>{
        then drew a box anyway. The pen's presses fall through to the click
        section, exactly as the plot line's do. */
     const [mx,my]=screenToMap(ox,oy);
-    PLOTPLACE={t:PLOTMODE,a:snapRectPt([mx,my]).pt,b:[mx,my]};
+    PLOTPLACE={t:PLOTMODE,a:snapRectPt([mx,my]).pt,b:[mx,my],pid:e.pointerId};
     PLOTPLACE.b=PLOTPLACE.a.slice();
     try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
     draw(); return;
@@ -27754,6 +30068,90 @@ canvas.addEventListener('pointermove',e=>{      // a measurement being pulled
   say('Measuring '+rulerLabel(rulerLen(RULERDRAG))+'.');
   draw();
 });
+canvas.addEventListener('pointermove',e=>{      // a building cut being dragged
+  if(!BLDCUT||!BLDCUT.a||!VIEW) return;
+  const r=canvas.getBoundingClientRect();
+  const [mx,my]=screenToMap(e.clientX-r.left,e.clientY-r.top);
+  BLDCUT.b=[mx,my]; draw();
+});
+canvas.addEventListener('pointerup',e=>{        // the cut lands, and splits
+  if(!BLDCUT||!BLDCUT.a) return;
+  if(BLDCUT.pid!=null&&e.pointerId!=null&&e.pointerId!==BLDCUT.pid) return;      // 24e
+  const C=BLDCUT; BLDCUT=null;
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+  /* A TAP PLOTS A CORNER; a drag cuts straight. Four screen pixels tell
+     them apart, as everywhere else in this file. */
+  const r0=canvas.getBoundingClientRect();
+  const moved=Math.hypot(e.clientX-r0.left-(C.px||0),e.clientY-r0.top-(C.py||0));
+  if(moved<4&&C.tool==='clearrect'){ $('roofHint').textContent='Drag a box, corner to corner.'; draw(); return; }
+  if(moved<4){
+    BLDPTS.push([C.a[0],C.a[1]]);
+    if(C.tool==='clearpoly'){
+      $('roofHint').textContent=BLDPTS.length<3?'Corner '+BLDPTS.length+' — tap the rest, then press the button.'
+        :BLDPTS.length+' corners — press the button to clear inside them, or tap more.';
+      bldSync(); draw(); return;
+    }
+    $('roofHint').textContent=BLDPTS.length<2
+      ?'First corner — tap the rest, then press the Split button to cut along them.'
+      :BLDPTS.length+' corners — press Split building to cut along them, or tap more.';
+    bldSync(); draw(); return;
+  }
+  BLDPTS=[];
+  if(C.tool==='clearrect'){
+    /* the box as seen: square to the screen, whatever the map is turned to */
+    const r1=canvas.getBoundingClientRect();
+    const sx0=C.px, sy0=C.py, sx1=e.clientX-r1.left, sy1=e.clientY-r1.top;
+    const box=[screenToMap(sx0,sy0),screenToMap(sx1,sy0),screenToMap(sx1,sy1),screenToMap(sx0,sy1)];
+    const c=clearBuildingsWith(box);
+    if(c.err){ $('roofHint').textContent='Not cleared — '+c.err+'.'; draw(); return; }
+    bldSayCleared(c,'in the box'); bldSync(); draw(); return;
+  }
+  if(C.tool==='clearpoly'){ $('roofHint').textContent='Tap corners for this one; a drag is the box tool.'; draw(); return; }
+  const len=Math.hypot(C.b[0]-C.a[0],C.b[1]-C.a[1]);
+  if(len<0.5){ $('roofHint').textContent='Too short — drag right across the building.'; draw(); return; }
+  const cut=carveBuilding([C.a,C.b]);
+  if(cut.err){ $('roofHint').textContent='Not split — '+cut.err+'.'; draw(); return; }
+  $('roofHint').textContent='Split into '+cut.areaA.toFixed(1)+' and '+cut.areaB.toFixed(1)+' m²'
+    +(cut.roofs?'; its roof is dropped, click each part in Roof':'')
+    +'. Remove building takes either part off.';
+  bldSync(); draw();
+});
+canvas.addEventListener('pointermove',e=>{      // a deck side being pulled
+  if(!DECKSIDE||!VIEW) return;
+  const r=canvas.getBoundingClientRect();
+  const ox=e.clientX-r.left, oy=e.clientY-r.top;
+  /* A TAP IS NOT A RESIZE. Nothing moves and nothing goes on the undo stack
+     until the hand has travelled far enough to mean it -- the same four
+     pixels the map's own pan uses to tell a click from a drag. */
+  if(!DECKSIDE.moved&&Math.hypot(ox-DECKSIDE.px,oy-DECKSIDE.py)<4) return;
+  if(!DECKSIDE.moved){
+    DECKSIDE.moved=true;
+    pushRedo('the deck side you moved',DECKSIDE.undo);
+  }
+  const [mx,my]=screenToMap(ox,oy);
+  deckSideTo(mx,my);
+  const z=deckSideSize(DECKSIDE);
+  $('roofHint').textContent='Deck '+z.w.toFixed(2)+' × '+z.h.toFixed(2)+' m.';
+  draw();
+});
+canvas.addEventListener('pointerup',e=>{        // a deck side let go
+  if(!DECKSIDE) return;
+  if(DECKSIDE.pid!=null&&e.pointerId!=null&&e.pointerId!==DECKSIDE.pid) return;   // 24e
+  const S=DECKSIDE; DECKSIDE=null;
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+  if(!S.moved){
+    /* the press was captured, so the click path further down is never reached;
+       selecting the line is done here instead, exactly as it was */
+    RIDGESEL=(RIDGESEL===S.q.i)?null:S.q.i;
+    $('ridgeDel').disabled=(RIDGESEL==null);
+    $('roofHint').textContent=RIDGESEL==null?'Ridge deselected.'
+      :'Ridge selected — Remove takes it out, or drag this side to resize the deck.';
+    draw(); return;
+  }
+  const z=deckSideSize(S);
+  $('roofHint').textContent='Deck resized — '+z.w.toFixed(2)+' × '+z.h.toFixed(2)+' m.';
+  syncHeightUI(); draw(); roofReport();
+});
 canvas.addEventListener('pointermove',e=>{      // an item being carried
   if(!ITEMDRAG||!VIEW||!ROOF) return;
   const r=canvas.getBoundingClientRect();
@@ -27877,6 +30275,7 @@ canvas.addEventListener('pointerup',e=>{
       'The line is a boundary now, as if it had been drawn. The cut is still in hand.');
     return;
   }
+  if(ERASEDRAG&&ERASEDRAG.pid!=null&&e.pointerId!=null&&e.pointerId!==ERASEDRAG.pid) return;  // 24e
   if(ERASEDRAG&&ERASEDRAG.g==='rect'){        // the eraser's box
     const D=ERASEDRAG;
     try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
@@ -27891,6 +30290,7 @@ canvas.addEventListener('pointerup',e=>{
     return;
   }
   if(PLOTPAINT){                              // finish a painted run
+    if(PLOTPAINT.pid!=null&&e.pointerId!=null&&e.pointerId!==PLOTPAINT.pid) return;   // 24e
     const P=PLOTPAINT; PLOTPAINT=null;
     try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
     if(VIEW){
@@ -27909,12 +30309,18 @@ canvas.addEventListener('pointerup',e=>{
     pushRedo('the '+P.t+' you painted',()=>{
       const at=PLOTITEMS.indexOf(added); if(at>=0) PLOTITEMS.splice(at,1);
     });
+    PLOTMODE=null; PLOTPLACE=null;               // the tool stands down (25a)
     syncPlotItems();
     ptSay(P.t+' painted, '+len.toFixed(1)+' m at '+P.w.toFixed(1)+' m wide.',
       'The line you drew was thinned and smoothed, then given the brush width.');
     draw(); return;
   }
   if(PLOTPLACE){                              // commit a plot item
+    /* NOT THIS FINGER, NOT THIS RELEASE (24e). With two fingers down the
+       pinch guard has not fired yet, so the second finger's lift reached
+       here and finished the first finger's box at ITS position -- a drive
+       stretched to wherever the other hand happened to be. */
+    if(PLOTPLACE.pid!=null&&e.pointerId!=null&&e.pointerId!==PLOTPLACE.pid) return;
     const P=PLOTPLACE; PLOTPLACE=null;
     try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
     /* read the far corner from THIS event, not the last preview move, or a
@@ -27936,8 +30342,10 @@ canvas.addEventListener('pointerup',e=>{
     pushRedo('the '+P.t+' you drew',()=>{
       const at=PLOTITEMS.indexOf(added); if(at>=0) PLOTITEMS.splice(at,1);
     });
+    PLOTMODE=null; PLOTPLACE=null;               // the tool stands down (25a)
     syncPlotItems();
-    $('ptHint').textContent=P.t+' added, '+w.toFixed(1)+' × '+h.toFixed(1)+' m.';
+    $('ptHint').textContent=P.t+' added, '+w.toFixed(1)+' × '+h.toFixed(1)
+      +' m. Drag a corner to reshape it, or double-tap an edge for a new one.';
     draw(); return;
   }
   if(ROADDRAG){
@@ -28214,7 +30622,169 @@ canvas.addEventListener('pointerup',e=>{
     }
   }
 });
-canvas.addEventListener('pointercancel',()=>{drag=null;canvas.style.cursor='crosshair';});
+/* A CANCELLED TOUCH LAYS NOTHING (24d). This cleared the pan and left every
+   tool armed on its first point, so the next lift of any finger -- Safari
+   sends no pointerup for a touch it has taken -- laid a rectangle, a brush
+   run or a cut from there to wherever that finger was. retractGesture is
+   what a second finger does: everything in hand goes back where it was. */
+/* RESHAPING (24z). In the CAPTURE phase so it is seen before the pan, and it
+   takes the press only when it lands on a handle or an edge with no tool
+   armed; everything else falls through. The deck arrow and the area label
+   come first, so a press on either of those is not ours. */
+canvas.addEventListener('pointerdown',e=>{
+  if(MODE!=='plot'||!VIEW||e.button) return;
+  if(PLOTMODE||ERASEMODE||LINECUT||SELADD||ACCESSMODE||(DRAW&&isPlotPen(DRAW.kind))) return;
+  if(e.pointerType==='touch'&&FINGERS.size>1) return;
+  const r=canvas.getBoundingClientRect();
+  const ox=e.clientX-r.left, oy=e.clientY-r.top;
+  if(typeof deckTurnHit==='function'&&deckTurnHit(ox,oy)) return;
+  if(typeof areaLabHit==='function'&&areaLabHit(ox,oy)!=null) return;
+  const h=vtxHit(ox,oy);
+  if(!h) return;
+  const it=h.it, was=it.ring.map(q=>q.slice());
+  const [mx,my]=screenToMap(ox,oy);
+  /* A DOUBLE-TAP ON AN EDGE ADDS A CORNER there, and it is in hand at once */
+  const now=Date.now();
+  const tap=VTXTAP&&(now-VTXTAP.t)<VTX_TAP_MS&&Math.hypot(VTXTAP.x-ox,VTXTAP.y-oy)<VTX_TAP_PX;
+  VTXTAP={t:now,x:ox,y:oy};
+  if(h.kind==='edge'&&tap){
+    const a=it.ring[h.i], b=it.ring[(h.i+1)%it.ring.length];
+    const p=[a[0]+(b[0]-a[0])*h.t, a[1]+(b[1]-a[1])*h.t];
+    it.ring.splice(h.i+1,0,p);
+    VTX={it:it,i:h.i+1,was:was,pid:e.pointerId,moved:false};
+    VTXTAP=null;
+  } else if(h.kind==='vtx'){
+    VTX={it:it,i:h.i,was:was,pid:e.pointerId,moved:false};
+  } else {
+    /* THE SHUTTER. The edge moves square to itself, its two corners with it
+       -- and a corner is LEFT BEHIND at each end where the edge was, so the
+       bay's sides stand straight up from the old line rather than running
+       diagonally from the neighbours. That is what makes it a rectangle,
+       which is what George drew for me. Two extra corners on the ring, in
+       the same Undo as the pull. */
+    const n=it.ring.length;
+    const a=it.ring[h.i].slice(), b=it.ring[(h.i+1)%n].slice();
+    const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1;
+    /* i0 is the index into `was`; the corners are inserted on each move, not
+       here, so the ring is only ever rebuilt from a known-good base (25e) */
+    EDGE={it:it,i0:h.i,was:was,pid:e.pointerId,moved:false,
+          nx:-(b[1]-a[1])/L,ny:(b[0]-a[0])/L,mx:mx,my:my};
+  }
+  try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  e.preventDefault(); e.stopImmediatePropagation();
+  draw();
+},{capture:true});
+canvas.addEventListener('pointermove',e=>{
+  const g=VTX||EDGE;
+  if(!g) return;
+  if(g.pid!=null&&e.pointerId!=null&&e.pointerId!==g.pid) return;
+  const r=canvas.getBoundingClientRect();
+  const [mx,my]=screenToMap(e.clientX-r.left,e.clientY-r.top);
+  if(VTX){
+    /* the other items first, then square to its own neighbours (25a) */
+    let p=vtxSnap([mx,my],VTX.it);
+    p=vtxSquare(VTX.it.ring,VTX.i,p);
+    VTX.it.ring[VTX.i]=p; VTX.moved=true;
+    VTX.live=[p];                                  // no handle while in hand
+  } else {
+    /* BUILT FRESH FROM `was` EVERY MOVE (25e). Writing into it.ring by index
+       could not survive the live tidy shifting those indices underneath it,
+       and without the live tidy the drag showed part lengths and stub
+       handles all the way. From the ring as it was, plus the two corners and
+       the offset, the shape is rebuilt and tidied each time -- so what is on
+       screen during the drag is what the release will keep. */
+    const d=(mx-EDGE.mx)*EDGE.nx+(my-EDGE.my)*EDGE.ny;
+    const base=EDGE.was.map(q=>q.slice());
+    const i=EDGE.i0, n0=base.length;
+    const a0=base[i].slice(), b0=base[(i+1)%n0].slice();
+    let a=[a0[0]+EDGE.nx*d, a0[1]+EDGE.ny*d];
+    let b=[b0[0]+EDGE.nx*d, b0[1]+EDGE.ny*d];
+    /* the edge's LINE snaps: if either end lands near another line, carry
+       the whole edge to it so it stays square */
+    const sa=vtxSnap(a,EDGE.it), sb=vtxSnap(b,EDGE.it);
+    const da=(sa[0]-a[0])*EDGE.nx+(sa[1]-a[1])*EDGE.ny;
+    const db=(sb[0]-b[0])*EDGE.nx+(sb[1]-b[1])*EDGE.ny;
+    const dd=(sa!==a)?da:(sb!==b)?db:0;
+    a=[a[0]+EDGE.nx*dd,a[1]+EDGE.ny*dd]; b=[b[0]+EDGE.nx*dd,b[1]+EDGE.ny*dd];
+    /* THE MOVE-WALL RULE (25g). Each end slides ALONG ITS NEIGHBOUR'S LINE:
+       the neighbour keeps its direction and changes length, the pulled edge
+       keeps its direction, and no corner is added. Only where a neighbour is
+       PARALLEL to the pulled edge -- the bay case, two added corners flat on
+       one line -- is there no meeting point; there a corner is left behind
+       and the end moves square, which is what keeps a bay square-sided. */
+    const ex=(b0[0]-a0[0]), ey=(b0[1]-a0[1]);     // the edge's direction
+    const meet=(p,q,c)=>{                          // line p->q with the new edge line through c
+      const ux=q[0]-p[0], uy=q[1]-p[1];
+      const den=ux*ey-uy*ex;
+      if(Math.abs(den)<1e-9*(Math.hypot(ux,uy)*Math.hypot(ex,ey)+1e-12)) return null; // parallel
+      const t=((c[0]-p[0])*ey-(c[1]-p[1])*ex)/den;
+      return [p[0]+ux*t, p[1]+uy*t];
+    };
+    const prev=base[(i-1+n0)%n0], next=base[(i+2)%n0];
+    const A=(n0>3)?meet(prev,a0,a):null;
+    const B=(n0>3)?meet(next,b0,b):null;
+    /* b's index is tracked, not searched: b0 is a copy and indexOf would
+       never find it. It sits one past a, and one further if a corner was
+       left behind at a; at the wrap it is index 0 either way. */
+    const wrap=((i+1)%n0)===0;
+    let jb=wrap?0:i+1;
+    if(A) base[i]=A;                               // the neighbour stretched to meet it
+    else { base.splice(i+1,0,a); if(!wrap) jb=i+2; } // parallel: corner left behind
+    if(B) base[jb]=B;
+    else base.splice(jb,0,b);
+    EDGE.it.ring=vtxDropFlat(base);
+    EDGE.moved=true;
+    EDGE.live=[A||a,B||b];                         // no handles while in hand
+  }
+  e.preventDefault(); e.stopImmediatePropagation();
+  draw();
+},{capture:true});
+canvas.addEventListener('pointerup',e=>{
+  const g=VTX||EDGE;
+  if(!g) return;
+  if(g.pid!=null&&e.pointerId!=null&&e.pointerId!==g.pid) return;
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+  const it=g.it, was=g.was, moved=g.moved, wasEdge=!!EDGE, vi=VTX?VTX.i:-1;
+  VTX=null; EDGE=null;
+  /* THE 180 SNAP (25h). A corner dragged to within ANG_SNAP of a straight
+     line has no business being a corner: it is taken out, its neighbours
+     joined, and the side reads as one line. Only on landing, so the handle
+     stays in hand all the way through the line. Three corners always kept. */
+  if(vi>=0&&moved&&it.ring.length>3){
+    const a=vtxAngle(it.ring,vi);
+    if(a!=null&&Math.abs(a-180)<=ANG_SNAP){
+      it.ring.splice(vi,1);
+      ptSay('Corner straightened out.','Undo brings it back.');
+    }
+  }
+  /* WELD (25a): a corner dropped on another corner of the same item becomes
+     one corner. Three must survive, or there is no shape left. */
+  if(vi>=0&&moved&&it.ring.length>3){
+    const p=it.ring[vi];
+    for(let k=0;k<it.ring.length;k++){
+      if(k===vi) continue;
+      if(Math.hypot(it.ring[k][0]-p[0],it.ring[k][1]-p[1])<=VTX_WELD){
+        it.ring[k]=[p[0],p[1]];                 // the survivor sits where it was dropped
+        it.ring.splice(vi,1);
+        ptSay('Corners joined.','Undo separates them again.');
+        break;
+      }
+    }
+  }
+  /* an edge pressed and let go without moving: the two corners it laid
+     down are dead weight -- put the ring back as it was */
+  if(wasEdge&&!moved){ it.ring=was.map(q=>q.slice()); }
+  /* a corner added by a double-tap and not dragged still stays */
+  else if(moved||it.ring.length!==was.length)
+    vtxCommit(it,was,wasEdge?'the edge you pulled':'the corner you moved',wasEdge);
+  e.preventDefault(); e.stopImmediatePropagation();
+  draw();
+},{capture:true});
+canvas.addEventListener('pointercancel',()=>{
+  retractGesture();
+  canvas.style.cursor='crosshair';
+  draw();
+});
 canvas.addEventListener('contextmenu',e=>{      // right-click: undo the last point
   if(MASKMODE){ e.preventDefault(); if(maskUndo()) draw(); return; }
   /* THE PLOT PEN GETS THE SAME RIGHT-CLICK AS THE OUTLINE PEN.
@@ -28251,11 +30821,14 @@ canvas.addEventListener('contextmenu',e=>{      // right-click: undo the last po
       const t=PLOTPLACE.t; PLOTPLACE=null;
       ptSay('The '+t+' you were dragging was dropped.');
     }else{
-      const gone=PLOTITEMS.pop();
-      /* keep the shared stack honest: that entry would put it back a second time */
-      for(let i=REDO.length-1;i>=0;i--)
-        if(REDO[i].what==='the '+gone.type+' you drew'){ REDO.splice(i,1); syncRedo(); break; }
-      ptSay(gone.type+' removed — '+PLOTITEMS.length+' left.');
+      /* RIGHT-CLICK IS UNDO (25f), not a delete. It used to pop the last item
+         AND strip that item's entry out of the undo stack, so the deletion
+         could not be taken back and every reshape made to that item went with
+         it -- which is the whole of George's "undo is not undoing my edits":
+         he was right-clicking, and right-click was destroying work. One press
+         is now one step back, whatever that step was. */
+      $('ptUndo').onclick();
+      return;
     }
     syncPlotItems(); draw(); return;
   }
@@ -28352,7 +30925,13 @@ window.addEventListener('keydown',e=>{
     popShow('ghostPop',false); popShow('exportPop',false);
     return;
   }
+  if((BLDCUT&&BLDCUT.a)||BLDPTS.length){ BLDCUT=null; BLDPTS=[]; $('roofHint').textContent='Split cancelled.'; bldSync(); draw(); return; }
   if(MODE!=='roof') return;
+  if(DECKSIDE){                               // put the side back where it was
+    const S=DECKSIDE; DECKSIDE=null;
+    deckSidePut(S);
+    $('roofHint').textContent='Resize cancelled.'; draw(); return;
+  }
   if(ITEMDRAG){                               // put it back where it was
     const it=ROOF&&ROOF.items[ITEMDRAG.i];
     if(it){ it.x=ITEMDRAG.from.x; it.y=ITEMDRAG.from.y; it.rot=ITEMDRAG.from.rot; }
@@ -28377,6 +30956,27 @@ window.addEventListener('keydown',e=>{
 });
 canvas.addEventListener('dblclick',ev=>{
   if(MASKMODE) return;                        // no view reset under the brush
+  /* NO VIEW RESET ON A DOUBLE-CLICK (25b). This is what threw the view off
+     below the plot: zoom to 1, pan to nothing, wherever the cursor was. The
+     reset button on the zoom bar is the way to reset. What a double-click on
+     a plot ITEM does instead is OPEN it -- its handles and angles come up
+     and it can be reshaped, which is the gesture George wants. */
+  if(MODE==='plot'&&VIEW&&!PLOTMODE&&!ERASEMODE&&!LINECUT&&!SELADD&&!ACCESSMODE
+     &&!(DRAW&&isPlotPen(DRAW.kind))){
+    const rr=canvas.getBoundingClientRect();
+    const ox=ev.clientX-rr.left, oy=ev.clientY-rr.top;
+    const h=(typeof vtxHit==='function')?vtxHit(ox,oy):null;
+    if(h){ VTXOPEN=h.it; ev.preventDefault(); draw(); return; }
+    /* inside an item, though not on its outline: open that one */
+    const [mx,my]=screenToMap(ox,oy);
+    for(const it of vtxItems()){
+      if(pip([mx,my],it.ring.concat([it.ring[0]]))){
+        VTXOPEN=it; ev.preventDefault(); draw(); return;
+      }
+    }
+    VTXOPEN=null;                    // a double-click on open ground closes it
+    ev.preventDefault(); draw(); return;
+  }
   /* the plot pen lives in PLOT mode, so it is asked before the roof branch —
      and before the view reset this handler otherwise does */
   if(DRAW&&DRAW.kind==='plotline'){ finishPlotLine(); return; }
@@ -28417,7 +31017,10 @@ canvas.addEventListener('dblclick',ev=>{
        shape by accident. Solving is deliberate now: finish the outline, draw
        the lines, then Re-render. */
   }
-  resetView();
+  /* NO RESET HERE (25b). Every double-click that nothing else claimed used to
+     reset the view -- zoom to 1, pan to nothing -- which is what threw
+     George's view off below the plot. The button on the zoom bar and the 0
+     key are the ways to reset; a double-click on the map is not one. */
 });
 
 $('zin').onclick=()=>setZoom(ZOOM*1.5);
@@ -28493,6 +31096,12 @@ $('go').onclick=async()=>{
     if(!gotAreas.length&&!gotLines.length)
       throw new Error('Nothing came back for that box — widen it, or check the location.');
     /* ---- commit ---- */
+    /* A NEW FETCH IS A NEW DRAWING (24e). Only PT, LINES and AREAS were
+       replaced, so everything drawn ON the old map came with it: George's
+       save carried eleven plot items from a plot 4.5 km east and 14.5 km
+       north. They painted nothing near the new plot, but they are in the
+       session, in the exports, and under the box tool's snap. */
+    clearDrawnWork();
     PT=pt;
     LINES=gotLines; AREAS=gotAreas;
     /* only ever a suggestion, and only when the field has not been set by
@@ -28507,7 +31116,7 @@ $('go').onclick=async()=>{
       say(LINES.length+' lines, '+AREAS.length+' areas in '+calls+' API call'
          +(calls===1?'':'s')+'.\nClick a yard to change the selected plot.');
     SEL=autoPick(); SELSET.clear(); if(!alignFrontWall()) autoOrient(true); ZOOM=1;PANX=0;PANY=0; draw(); showSel(); showZoom();
-    $('autoRot').disabled=false; $('northUp').disabled=false; $('modeRoof').disabled=false;
+    $('autoRot').disabled=false; $('northUp').disabled=false; $('modeRoof').disabled=false; $('modeBuilding').disabled=false;
     $('exportAll').disabled=!(LINES.length+AREAS.length);
     $('exportPng').disabled=!(LINES.length+AREAS.length);
     $('attrib').textContent='Contains OS data © Crown copyright and database right '+new Date().getFullYear();
